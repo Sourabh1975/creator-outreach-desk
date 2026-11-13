@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Private creator outreach campaign manager for personalised Instagram collaboration messages.">
+  <title>Creator Outreach Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">C</span><div><strong>Creator Desk</strong><small>Outreach, organised.</small></div></div>
+      <nav>
+        <button class="nav-item active"><span>⌁</span> Campaign</button>
+        <button class="nav-item" id="exportBtn"><span>⇩</span> Export progress</button>
+        <button class="nav-item danger" id="resetBtn"><span>↺</span> Reset progress</button>
+      </nav>
+      <div class="sidebar-note"><strong>Safe workflow</strong><p>Messages are copied and profiles are opened for your review. This dashboard never logs into Instagram or auto-sends cold DMs.</p></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">INFLUENCER MARKETING</p><h1>Women’s fashion outreach</h1></div>
+        <div class="queue-actions"><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
+      </header>
+
+      <section class="metrics" aria-label="Campaign overview">
+        <article><span>Total creators</span><strong id="totalMetric">—</strong><small>1K–100K followers</small></article>
+        <article><span>Messages sent</span><strong id="sentMetric">0</strong><small id="sentPercent">0% complete</small></article>
+        <article><span>Replies</span><strong id="replyMetric">0</strong><small id="replyPercent">No replies yet</small></article>
+        <article class="accent-card"><span>Next action</span><strong id="remainingMetric">—</strong><small>creators remaining</small></article>
+      </section>
+
+      <section class="workspace">
+        <div class="workspace-head">
+          <div><p class="eyebrow">CREATOR PIPELINE</p><h2>Your outreach list</h2></div>
+          <div class="filters"><label class="search"><span>⌕</span><input id="searchInput" placeholder="Search name, handle or city"></label><select id="statusFilter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="sent">Sent</option><option value="replied">Replied</option><option value="skipped">Skipped</option></select></div>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Creator</th><th>Audience</th><th>Contact</th><th>Status</th><th>Action</th></tr></thead><tbody id="creatorRows"></tbody></table>
+          <div id="emptyState" class="empty" hidden>No creators match this filter.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="campaignDialog">
+    <form method="dialog" id="campaignForm">
+      <div class="dialog-head"><div><p class="eyebrow">CAMPAIGN SETTINGS</p><h2>Personalise your outreach</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <div class="form-grid"><label>Brand name<input id="brandName" required placeholder="House of Sandhya"></label><label>Your name<input id="senderName" required placeholder="Sourabh"></label><label>Collaboration type<select id="collabType"><option>paid</option><option>barter</option><option>paid or barter</option></select></label><label>Brand link<input id="brandLink" placeholder="https://instagram.com/yourbrand"></label></div>
+      <label>Message template<textarea id="messageTemplate" rows="9"></textarea></label>
+      <p class="tokens">Available: <code>{first_name}</code> <code>{creator_name}</code> <code>{handle}</code> <code>{brand}</code> <code>{sender}</code> <code>{collab_type}</code> <code>{brand_link}</code></p>
+      <div class="dialog-actions"><button class="button ghost" value="cancel">Cancel</button><button class="button primary" id="saveCampaignBtn" value="default">Save campaign</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="queueDialog" class="queue-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">OUTREACH QUEUE</p><h2 id="queueCreatorName">Creator</h2></div><button class="icon-button" id="closeQueueBtn" aria-label="Close">×</button></div>
+    <div class="queue-profile"><div class="avatar" id="queueAvatar">C</div><div><strong id="queueHandle">@handle</strong><span id="queueMeta">— followers</span></div></div>
+    <label>Personalised message<textarea id="queueMessage" rows="11"></textarea></label>
+    <div class="queue-buttons"><button class="button ghost" id="skipBtn">Skip</button><button class="button secondary" id="copyBtn">Copy message</button><button class="button primary" id="openInstagramBtn">Copy + open Instagram ↗</button></div>
+    <p class="queue-help">Review the message in Instagram and press Send yourself. Then mark the result here.</p>
+    <div class="result-buttons"><button id="markSentBtn">✓ Mark sent & next</button><button id="markRepliedBtn">★ Mark replied</button></div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
