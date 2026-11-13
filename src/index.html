@@ -51,9 +51,9 @@
   <dialog id="campaignDialog">
     <form method="dialog" id="campaignForm">
       <div class="dialog-head"><div><p class="eyebrow">CAMPAIGN SETTINGS</p><h2>Personalise your outreach</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
-      <div class="form-grid"><label>Brand name<input id="brandName" required placeholder="House of Sandhya"></label><label>Your name<input id="senderName" required placeholder="Sourabh"></label><label>Collaboration type<select id="collabType"><option>paid</option><option>barter</option><option>paid or barter</option></select></label><label>Brand link<input id="brandLink" placeholder="https://instagram.com/yourbrand"></label></div>
+      <div class="form-grid"><label>Brand name<input id="brandName" required placeholder="House of Sandhya"></label><label>Your name<input id="senderName" required placeholder="Sourabh"></label><label>Collaboration type<select id="collabType"><option>paid</option><option>barter</option><option>paid or barter</option></select></label><label>Website<input id="brandLink" placeholder="https://houseofsandhya.com"></label><label>Instagram handle<input id="instagramHandle" placeholder="@houseofsandhya"></label><label>Contact details<input id="contactDetails" placeholder="Email or WhatsApp number"></label></div>
       <label>Message template<textarea id="messageTemplate" rows="9"></textarea></label>
-      <p class="tokens">Available: <code>{first_name}</code> <code>{creator_name}</code> <code>{handle}</code> <code>{brand}</code> <code>{sender}</code> <code>{collab_type}</code> <code>{brand_link}</code></p>
+      <p class="tokens">Available: <code>{first_name}</code> <code>{creator_name}</code> <code>{handle}</code> <code>{brand}</code> <code>{sender}</code> <code>{collab_type}</code> <code>{website}</code> <code>{instagram}</code> <code>{contact_details}</code></p>
       <div class="dialog-actions"><button class="button ghost" value="cancel">Cancel</button><button class="button primary" id="saveCampaignBtn" value="default">Save campaign</button></div>
     </form>
   </dialog>

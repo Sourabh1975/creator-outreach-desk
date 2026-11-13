@@ -1,11 +1,65 @@
 const STORAGE_KEY = "creator-desk-v1";
-const defaultTemplate = `Hi {first_name} 👋\n\nI’m {sender} from {brand}, a women’s clothing brand. We really liked your fashion content and would love to explore a {collab_type} Instagram collaboration with you.\n\nCould you please share your collaboration charges/media kit and preferred contact details?\n\nOur brand: {brand_link}\n\nThank you!`;
+const TEMPLATE_VERSION = 2;
+const defaultTemplate = `Hi {first_name},
+
+Greetings from House of Sandhya!
+
+We are an Indian apparel brand, and we're reaching out to explore an exciting collaboration opportunity with you.
+
+At House of Sandhya, we believe in creating fashion that reflects individuality and personal style. We'd love to collaborate with you on an exclusive fashion collection under your name.
+
+Introducing: House of Sandhya X {creator_name}
+
+The idea is to create and launch a dedicated collection inspired by your personal style, fashion sense, and audience.
+
+Here's how the collaboration would work:
+
+1. Your Exclusive Collection
+We will launch a dedicated collection under your name, featuring your identity as part of the collaboration.
+
+2. Branding & Promotion
+You would be responsible for promoting and branding your collection through your Instagram platform, including posts, stories, reels, and other promotional content.
+
+3. Revenue Sharing
+
+We are offering two collaboration models:
+
+Option A – Organic Promotion
+• You promote your exclusive collection through your social media.
+• You receive 30% of the sales revenue generated through your collection.
+• Applicable exclusively to prepaid orders.
+
+Option B – Promotion + Paid Advertising
+• We launch your exclusive collection and additionally run paid advertisements to promote it.
+• You receive 20% of the sales revenue generated through your collection.
+• We take care of the advertising and campaign execution.
+• Applicable exclusively to prepaid orders.
+
+Our goal is to build a long-term association where both your personal brand and House of Sandhya grow together.
+
+We believe this could be a great opportunity to turn your personal fashion identity into an exclusive collection.
+
+If this interests you, we'd love to discuss the idea further and explore how we can bring this collaboration to life.
+
+Looking forward to hearing from you!
+
+Warm regards,
+Team House of Sandhya
+House of Sandhya
+{website}
+{instagram}
+{contact_details}`;
 
 const $ = (id) => document.getElementById(id);
 const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
-  campaign: { brand:"House of Sandhya", sender:"Sourabh", collabType:"paid or barter", brandLink:"", template:defaultTemplate },
-  statuses: {}
+  campaign: { brand:"House of Sandhya", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", template:defaultTemplate },
+  statuses: {}, templateVersion:TEMPLATE_VERSION
 };
+if(state.templateVersion!==TEMPLATE_VERSION){
+  state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",template:defaultTemplate};
+  state.templateVersion=TEMPLATE_VERSION;
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+}
 let leads = [];
 let queueIndex = -1;
 
@@ -19,7 +73,9 @@ function messageFor(lead){
   const c=state.campaign;
   return c.template.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",lead.name||lead.handle)
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
-    .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your link]");
+    .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your website]")
+    .replaceAll("{website}",c.brandLink||"[Website]").replaceAll("{instagram}",c.instagramHandle||"[Instagram Handle]")
+    .replaceAll("{contact_details}",c.contactDetails||"[Contact Details]");
 }
 function contactFor(lead){
   if(lead.public_business_email) return `Direct: ${lead.public_business_email}`;
@@ -77,8 +133,8 @@ document.addEventListener("click",async(e)=>{
   const open=e.target.closest("[data-open]"); if(open) openQueue(leadByHandle(open.dataset.open));
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
-$("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
-$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),template:$("messageTemplate").value};save();$("campaignDialog").close();showToast("Campaign settings saved");});
+$("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
+$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value));
