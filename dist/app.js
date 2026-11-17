@@ -1,6 +1,6 @@
 const STORAGE_KEY = "creator-desk-v1";
-const TEMPLATE_VERSION = 3;
-const defaultSubject = `{creator_name} × House of Sandhya — Exclusive Collection Proposal`;
+const TEMPLATE_VERSION = 4;
+const defaultSubject = `Exclusive Collection Collaboration Proposal — House of Sandhya`;
 const defaultTemplate = `Hi {first_name},
 
 Greetings from House of Sandhya!
@@ -67,13 +67,26 @@ let queueIndex = -1;
 
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function statusOf(handle){ return state.statuses[handle]?.status || "pending"; }
-function firstName(lead){
-  const clean=(lead.name||lead.handle).replace(/[^a-zA-ZÀ-ÿ\s]/g," ").trim();
-  return clean.split(/\s+/)[0] || lead.handle;
+function handleName(lead){
+  return (lead.handle||"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim().replace(/\b\w/g,c=>c.toUpperCase());
 }
+function creatorIdentity(lead){
+  const raw=(lead.name||"").trim();
+  const words=raw.replace(/[^a-zA-ZÀ-ÿ\s]/g," ").trim().split(/\s+/).filter(Boolean);
+  if(words.length>=3&&words.every(word=>word.length===1)){
+    const creatorName=handleName(lead)||words.join("").replace(/^./,c=>c.toUpperCase());
+    return {firstName:creatorName.split(/\s+/)[0],creatorName};
+  }
+  const firstSegment=raw.split(/[|/•]/)[0].replace(/[^a-zA-ZÀ-ÿ\s.'-]/g," ").replace(/\s+/g," ").trim();
+  const generic=/\b(influencer|creator|fashion|lifestyle|beauty|makeup|artist|artistry|blogger|tech|real estate|model|official)\b/i;
+  if(firstSegment&&!generic.test(firstSegment)) return {firstName:firstSegment.split(/\s+/)[0],creatorName:firstSegment};
+  return {firstName:"there",creatorName:`@${lead.handle}`};
+}
+function firstName(lead){ return creatorIdentity(lead).firstName; }
+function creatorName(lead){ return creatorIdentity(lead).creatorName; }
 function messageFor(lead){
   const c=state.campaign;
-  return c.template.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",lead.name||lead.handle)
+  return c.template.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your website]")
     .replaceAll("{website}",c.brandLink||"[Website]").replaceAll("{instagram}",c.instagramHandle||"[Instagram Handle]")
@@ -81,7 +94,7 @@ function messageFor(lead){
 }
 function subjectFor(lead){
   const c=state.campaign;
-  return (c.subjectTemplate||defaultSubject).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",lead.name||lead.handle)
+  return (c.subjectTemplate||defaultSubject).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
 function contactFor(lead){
