@@ -86,16 +86,36 @@ function creatorIdentity(lead){
 }
 function firstName(lead){ return creatorIdentity(lead).firstName; }
 function creatorName(lead){ return creatorIdentity(lead).creatorName; }
+function profileFromCampaign(){
+  return {brandLink:state.campaign.brandLink||"",instagramHandle:state.campaign.instagramHandle||"",contactDetails:state.campaign.contactDetails||""};
+}
+function safeCompanyProfile(profile,company){
+  const clean={brandLink:profile?.brandLink||"",instagramHandle:profile?.instagramHandle||"",contactDetails:profile?.contactDetails||""};
+  if(company==="Brown Anatomy") for(const key of Object.keys(clean)) if(/house\s*of\s*sandhya|houseofsandhya/i.test(clean[key])) clean[key]="";
+  return clean;
+}
+function ensureCompanyProfiles(){
+  if(!state.companyProfiles){
+    const current=state.campaign.brand;
+    state.companyProfiles={
+      "House of Sandhya":current==="House of Sandhya"?profileFromCampaign():{brandLink:"",instagramHandle:"@houseofsandhya",contactDetails:""},
+      "Brown Anatomy":current==="Brown Anatomy"?safeCompanyProfile(profileFromCampaign(),"Brown Anatomy"):{brandLink:"",instagramHandle:"",contactDetails:""}
+    };
+  }
+  const active=safeCompanyProfile(state.companyProfiles[state.campaign.brand],state.campaign.brand);
+  state.companyProfiles[state.campaign.brand]=active;Object.assign(state.campaign,active);save();
+}
 function applySelectedCompany(text,selectedCompany){
   return COMPANIES.reduce((result,company)=>result.replaceAll(company,selectedCompany),text||"");
 }
 function messageFor(lead){
   const c=state.campaign;
-  return applySelectedCompany(c.template,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
+  const message=applySelectedCompany(c.template,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
-    .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your website]")
-    .replaceAll("{website}",c.brandLink||"[Website]").replaceAll("{instagram}",c.instagramHandle||"[Instagram Handle]")
-    .replaceAll("{contact_details}",c.contactDetails||"[Contact Details]");
+    .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"")
+    .replaceAll("{website}",c.brandLink||"").replaceAll("{instagram}",c.instagramHandle||"")
+    .replaceAll("{contact_details}",c.contactDetails||"");
+  return message.replace(/\n{3,}/g,"\n\n").trim();
 }
 function subjectFor(lead){
   const c=state.campaign;
@@ -158,7 +178,8 @@ function nextPending(){ const pending=pendingLeads(); return pending.find(l=>lea
 function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:new Date().toISOString()};save();render(); }
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 function switchCompany(company){
-  state.campaign.brand=company;save();$("homeCompany").value=company;$("queueCompany").value=company;
+  state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);
+  state.campaign.brand=company;Object.assign(state.campaign,safeCompanyProfile(state.companyProfiles[company],company));save();$("homeCompany").value=company;$("queueCompany").value=company;
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
   showToast(`Switched to ${company}`);
 }
@@ -170,7 +191,7 @@ document.addEventListener("click",async(e)=>{
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
 $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
-$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
+$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("homeCompany").addEventListener("change",()=>switchCompany($("homeCompany").value));
@@ -184,4 +205,4 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];render();
+ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];render();
