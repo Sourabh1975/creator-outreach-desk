@@ -15,7 +15,8 @@
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">C</span><div><strong>Creator Desk</strong><small>Outreach, organised.</small></div></div>
       <nav>
-        <button class="nav-item active"><span>⌁</span> Campaign</button>
+        <button class="nav-item active" id="campaignNav"><span>⌁</span> Campaign</button>
+        <button class="nav-item" id="whatsappNav"><span>◌</span> WhatsApp creators</button>
         <button class="nav-item" id="exportBtn"><span>⇩</span> Export progress</button>
         <button class="nav-item danger" id="resetBtn"><span>↺</span> Reset progress</button>
       </nav>
@@ -23,6 +24,7 @@
     </aside>
 
     <main>
+      <div id="campaignView">
       <header class="topbar">
         <div><p class="eyebrow">INFLUENCER MARKETING</p><h1>Women’s fashion outreach</h1></div>
         <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option></select></label><label class="home-company"><span>Offer</span><select id="homeOffer"><option value="exclusive">Exclusive collection</option><option value="commission">2% creator opportunity</option></select></label><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
@@ -45,6 +47,31 @@
           <div id="emptyState" class="empty" hidden>No creators match this filter.</div>
         </div>
       </section>
+      </div>
+
+      <div id="whatsappView" hidden>
+        <header class="topbar">
+          <div><p class="eyebrow">OLD CREATOR CONTACTS</p><h1>WhatsApp outreach</h1></div>
+          <div class="queue-actions"><label class="button ghost file-button">Import contacts<input id="waImport" type="file" accept="application/json,.json" hidden></label><button class="button primary" id="startWaQueueBtn">Start WhatsApp queue <span>→</span></button></div>
+        </header>
+        <section class="metrics" aria-label="WhatsApp outreach overview">
+          <article><span>Imported contacts</span><strong id="waTotalMetric">0</strong><small>Stored only in this browser</small></article>
+          <article><span>Messages sent</span><strong id="waSentMetric">0</strong><small id="waSentPercent">0% complete</small></article>
+          <article><span>Replies</span><strong id="waReplyMetric">0</strong><small>WhatsApp replies marked</small></article>
+          <article class="accent-card"><span>Next action</span><strong id="waRemainingMetric">0</strong><small>contacts remaining</small></article>
+        </section>
+        <section class="privacy-note"><strong>Private browser storage</strong><span>Phone numbers are imported from your local JSON file and are never published in the website code. Messages use the company and offer selected on the Campaign page.</span></section>
+        <section class="workspace">
+          <div class="workspace-head">
+            <div><p class="eyebrow">WHATSAPP PIPELINE</p><h2>Old collaborators</h2></div>
+            <div class="filters"><label class="search"><span>⌕</span><input id="waSearchInput" placeholder="Search name or number"></label><select id="waStatusFilter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="sent">Sent</option><option value="replied">Replied</option><option value="skipped">Skipped</option></select></div>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Creator</th><th>WhatsApp</th><th>Preferred shade</th><th>Status</th><th>Action</th></tr></thead><tbody id="waCreatorRows"></tbody></table>
+            <div id="waEmptyState" class="empty">Import the creator contacts JSON file to begin.</div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -69,6 +96,15 @@
     <div class="queue-buttons"><button class="button ghost" id="skipBtn">Skip</button><button class="button secondary" id="copyBtn">Copy message</button><button class="button primary" id="openInstagramBtn">Copy message + open Instagram ↗</button></div>
     <p class="queue-help">Review the message in Instagram and press Send yourself. Then mark the result here.</p>
     <div class="result-buttons"><button id="markSentBtn">✓ Mark sent & next</button><button id="markRepliedBtn">★ Mark replied</button></div>
+  </dialog>
+
+  <dialog id="waQueueDialog" class="queue-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">WHATSAPP QUEUE</p><h2 id="waQueueCreatorName">Creator</h2></div><button class="icon-button" id="closeWaQueueBtn" aria-label="Close">×</button></div>
+    <div class="queue-profile"><div class="avatar" id="waQueueAvatar">C</div><div><strong id="waQueueNumber">+91</strong><span id="waQueueMeta">Old collaborator</span></div></div>
+    <label>Personalised WhatsApp message<textarea id="waQueueMessage" rows="11"></textarea></label>
+    <div class="queue-buttons"><button class="button ghost" id="waSkipBtn">Skip</button><button class="button secondary" id="waCopyBtn">Copy message</button><button class="button primary" id="openWhatsAppBtn">Open WhatsApp ↗</button></div>
+    <p class="queue-help">WhatsApp opens with the message filled in. Review it and press Send yourself, then mark the result here.</p>
+    <div class="result-buttons"><button id="waMarkSentBtn">✓ Mark sent & next</button><button id="waMarkRepliedBtn">★ Mark replied</button></div>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>

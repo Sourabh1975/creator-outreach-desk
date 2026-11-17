@@ -1,4 +1,5 @@
 const STORAGE_KEY = "creator-desk-v1";
+const WA_STORAGE_KEY = "creator-desk-whatsapp-v1";
 const TEMPLATE_VERSION = 5;
 const COMPANIES = ["House of Sandhya","Brown Anatomy"];
 const defaultSubject = `Exclusive Collection Collaboration Proposal — {brand}`;
@@ -70,6 +71,7 @@ const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
   campaign: { brand:"House of Sandhya", offerType:"exclusive", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", subjectTemplate:defaultSubject, template:defaultTemplate },
   statuses: {}, templateVersion:TEMPLATE_VERSION
 };
+const waState = JSON.parse(localStorage.getItem(WA_STORAGE_KEY) || "null") || {contacts:[],statuses:{}};
 state.campaign.offerType=state.campaign.offerType||"exclusive";
 if(state.templateVersion!==TEMPLATE_VERSION){
   state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",subjectTemplate:defaultSubject};
@@ -80,9 +82,12 @@ if(state.templateVersion!==TEMPLATE_VERSION){
 }
 let leads = [];
 let queueIndex = -1;
+let waQueueIndex = -1;
 
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveWa(){ localStorage.setItem(WA_STORAGE_KEY,JSON.stringify(waState)); }
 function statusOf(handle){ return state.statuses[handle]?.status || "pending"; }
+function waStatusOf(phone){ return waState.statuses[phone]?.status || "pending"; }
 function handleName(lead){
   return (lead.handle||"").replace(/[._-]+/g," ").replace(/\s+/g," ").trim().replace(/\b\w/g,c=>c.toUpperCase());
 }
@@ -179,6 +184,31 @@ function render(){
   $("emptyState").hidden=filtered.length>0;
   updateMetrics();
 }
+function waLead(contact){
+  const handle=(contact.instagram_url||"").match(/instagram\.com\/([^/?#]+)/i)?.[1]||contact.name.replace(/\s+/g,"_").toLowerCase();
+  return {name:contact.name,handle,profile_url:contact.instagram_url||""};
+}
+function waMessageFor(contact){ return messageFor(waLead(contact)); }
+function updateWaMetrics(){
+  const statuses=waState.contacts.map(contact=>waStatusOf(contact.whatsapp_e164));
+  const sent=statuses.filter(status=>status==="sent"||status==="replied").length;
+  const replies=statuses.filter(status=>status==="replied").length;
+  $("waTotalMetric").textContent=waState.contacts.length;
+  $("waSentMetric").textContent=sent;$("waReplyMetric").textContent=replies;
+  $("waRemainingMetric").textContent=statuses.filter(status=>status==="pending").length;
+  $("waSentPercent").textContent=`${waState.contacts.length?Math.round(sent/waState.contacts.length*100):0}% complete`;
+}
+function renderWhatsApp(){
+  const query=$("waSearchInput").value.toLowerCase().trim();const filter=$("waStatusFilter").value;
+  const filtered=waState.contacts.filter(contact=>{
+    const hay=[contact.name,contact.whatsapp_display,contact.whatsapp_e164,contact.preferred_shade].join(" ").toLowerCase();
+    return (!query||hay.includes(query))&&(filter==="all"||waStatusOf(contact.whatsapp_e164)===filter);
+  });
+  $("waCreatorRows").innerHTML=filtered.map(contact=>{const status=waStatusOf(contact.whatsapp_e164);return `<tr><td><div class="creator"><div class="avatar">${escapeHtml(firstName(waLead(contact))[0]?.toUpperCase()||"C")}</div><div><strong>${escapeHtml(contact.name)}</strong><small>${contact.instagram_url?`Instagram profile available`:"Old collaborator"}</small></div></div></td><td class="contact">${escapeHtml(contact.whatsapp_display)}</td><td>${escapeHtml(contact.preferred_shade||"—")}</td><td><span class="status ${status}">${status[0].toUpperCase()+status.slice(1)}</span></td><td><div class="row-actions">${contact.instagram_url?`<button class="mini" data-wa-instagram="${escapeHtml(contact.whatsapp_e164)}">Instagram</button>`:""}<button class="mini primary" data-wa-open="${escapeHtml(contact.whatsapp_e164)}">Open WhatsApp</button></div></td></tr>`;}).join("");
+  $("waEmptyState").hidden=filtered.length>0;
+  if(!waState.contacts.length){$("waEmptyState").hidden=false;$("waEmptyState").textContent="Import the creator contacts JSON file to begin.";}else if(!filtered.length){$("waEmptyState").hidden=false;$("waEmptyState").textContent="No WhatsApp contacts match this filter.";}
+  updateWaMetrics();
+}
 function showToast(text){ const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(showToast.t);showToast.t=setTimeout(()=>el.classList.remove("show"),1800); }
 async function copyText(text,successMessage="Copied"){ try{await navigator.clipboard.writeText(text);showToast(successMessage);return true;}catch{showToast("Copy failed — select the text manually");return false;} }
 function leadByHandle(handle){ return leads.find(l=>l.handle===handle); }
@@ -206,13 +236,35 @@ function switchOffer(offerType){
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
   showToast(offerType==="commission"?"2% creator opportunity selected":"Exclusive collection selected");
 }
+function switchView(view){
+  const whatsapp=view==="whatsapp";$("campaignView").hidden=whatsapp;$("whatsappView").hidden=!whatsapp;
+  $("campaignNav").classList.toggle("active",!whatsapp);$("whatsappNav").classList.toggle("active",whatsapp);
+  if(whatsapp) renderWhatsApp();
+}
+function waContactByPhone(phone){ return waState.contacts.find(contact=>contact.whatsapp_e164===phone); }
+function pendingWaContacts(){ return waState.contacts.filter(contact=>waStatusOf(contact.whatsapp_e164)==="pending"); }
+function openWaQueue(contact){
+  if(!contact){if($("waQueueDialog").open)$("waQueueDialog").close();showToast(waState.contacts.length?"No pending WhatsApp contacts left":"Import contacts first");return;}
+  waQueueIndex=waState.contacts.indexOf(contact);$("waQueueCreatorName").textContent=contact.name;$("waQueueNumber").textContent=contact.whatsapp_display;
+  $("waQueueMeta").textContent=contact.preferred_shade?`Previous shade: ${contact.preferred_shade}`:"Old collaborator";
+  $("waQueueAvatar").textContent=firstName(waLead(contact))[0]?.toUpperCase()||"C";$("waQueueMessage").value=waMessageFor(contact);$("waQueueDialog").showModal();
+}
+function currentWaContact(){ return waState.contacts[waQueueIndex]; }
+function nextPendingWa(){ const pending=pendingWaContacts();return pending.find(contact=>waState.contacts.indexOf(contact)>waQueueIndex)||pending[0]; }
+function setWaStatus(contact,status){waState.statuses[contact.whatsapp_e164]={status,updatedAt:new Date().toISOString()};saveWa();renderWhatsApp();}
+function openWhatsApp(contact){const message=$("waQueueDialog").open&&currentWaContact()===contact?$("waQueueMessage").value:waMessageFor(contact);window.open(`https://wa.me/${contact.whatsapp_e164}?text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");}
 
 document.addEventListener("click",async(e)=>{
   const compose=e.target.closest("[data-compose]"); if(compose){const lead=leadByHandle(compose.dataset.compose);window.open(gmailComposeUrl(lead),"_blank","noopener,noreferrer");}
   const copy=e.target.closest("[data-copy]"); if(copy){const lead=leadByHandle(copy.dataset.copy);await copyText(messageFor(lead),"Message copied");}
   const open=e.target.closest("[data-open]"); if(open) openQueue(leadByHandle(open.dataset.open));
+  const waOpen=e.target.closest("[data-wa-open]");if(waOpen) openWaQueue(waContactByPhone(waOpen.dataset.waOpen));
+  const waInstagram=e.target.closest("[data-wa-instagram]");if(waInstagram){const contact=waContactByPhone(waInstagram.dataset.waInstagram);window.open(contact.instagram_url,"_blank","noopener,noreferrer");}
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
+$("waSearchInput").addEventListener("input",renderWhatsApp);$("waStatusFilter").addEventListener("change",renderWhatsApp);
+$("campaignNav").addEventListener("click",()=>switchView("campaign"));$("whatsappNav").addEventListener("click",()=>switchView("whatsapp"));
+$("waImport").addEventListener("change",async(e)=>{const file=e.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(!Array.isArray(imported))throw new Error("Invalid file");const contacts=imported.filter(contact=>contact.name&&/^91[6-9]\d{9}$/.test(String(contact.whatsapp_e164||"")));if(!contacts.length)throw new Error("No valid contacts");const unique=new Map(contacts.map(contact=>[String(contact.whatsapp_e164),contact]));waState.contacts=[...unique.values()];saveWa();renderWhatsApp();showToast(`${waState.contacts.length} WhatsApp contacts imported`);}catch{showToast("Could not import this contacts file");}finally{e.target.value="";}});
 $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
 $("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),offerType:state.campaign.offerType||"exclusive",sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
@@ -220,6 +272,13 @@ $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("homeCompany").addEventListener("change",()=>switchCompany($("homeCompany").value));
 $("homeOffer").addEventListener("change",()=>switchOffer($("homeOffer").value));
 $("queueCompany").addEventListener("change",()=>switchCompany($("queueCompany").value));
+$("startWaQueueBtn").addEventListener("click",()=>openWaQueue(pendingWaContacts()[0]));
+$("closeWaQueueBtn").addEventListener("click",()=>$("waQueueDialog").close());
+$("waCopyBtn").addEventListener("click",()=>copyText($("waQueueMessage").value,"Message copied"));
+$("openWhatsAppBtn").addEventListener("click",()=>openWhatsApp(currentWaContact()));
+$("waSkipBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"skipped");openWaQueue(nextPendingWa());});
+$("waMarkSentBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"sent");openWaQueue(nextPendingWa());});
+$("waMarkRepliedBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"replied");openWaQueue(nextPendingWa());});
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});
@@ -229,4 +288,4 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];$("homeOffer").value=state.campaign.offerType;render();
+ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];$("homeOffer").value=state.campaign.offerType;render();renderWhatsApp();
