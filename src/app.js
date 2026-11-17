@@ -1,15 +1,16 @@
 const STORAGE_KEY = "creator-desk-v1";
-const TEMPLATE_VERSION = 4;
-const defaultSubject = `Exclusive Collection Collaboration Proposal — House of Sandhya`;
+const TEMPLATE_VERSION = 5;
+const COMPANIES = ["House of Sandhya","Brown Anatomy"];
+const defaultSubject = `Exclusive Collection Collaboration Proposal — {brand}`;
 const defaultTemplate = `Hi {first_name},
 
-Greetings from House of Sandhya!
+Greetings from {brand}!
 
 We are an Indian apparel brand, and we're reaching out to explore an exciting collaboration opportunity with you.
 
-At House of Sandhya, we believe in creating fashion that reflects individuality and personal style. We'd love to collaborate with you on an exclusive fashion collection under your name.
+At {brand}, we believe in creating fashion that reflects individuality and personal style. We'd love to collaborate with you on an exclusive fashion collection under your name.
 
-Introducing: House of Sandhya X {creator_name}
+Introducing: {brand} X {creator_name}
 
 The idea is to create and launch a dedicated collection inspired by your personal style, fashion sense, and audience.
 
@@ -36,7 +37,7 @@ Option B – Promotion + Paid Advertising
 • We take care of the advertising and campaign execution.
 • Applicable exclusively to prepaid orders.
 
-Our goal is to build a long-term association where both your personal brand and House of Sandhya grow together.
+Our goal is to build a long-term association where both your personal brand and {brand} grow together.
 
 We believe this could be a great opportunity to turn your personal fashion identity into an exclusive collection.
 
@@ -45,8 +46,8 @@ If this interests you, we'd love to discuss the idea further and explore how we 
 Looking forward to hearing from you!
 
 Warm regards,
-Team House of Sandhya
-House of Sandhya
+Team {brand}
+{brand}
 {website}
 {instagram}
 {contact_details}`;
@@ -59,6 +60,7 @@ const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
 if(state.templateVersion!==TEMPLATE_VERSION){
   state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",subjectTemplate:defaultSubject};
   if(!state.templateVersion||state.templateVersion<2) state.campaign.template=defaultTemplate;
+  if(state.templateVersion&&state.templateVersion<5) state.campaign.template=(state.campaign.template||defaultTemplate).replaceAll("House of Sandhya","{brand}");
   state.templateVersion=TEMPLATE_VERSION;
   localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
 }
@@ -146,7 +148,7 @@ function openQueue(lead){
   if(!lead){showToast("No pending creators left");return;}
   queueIndex=leads.indexOf(lead);$("queueCreatorName").textContent=lead.name||lead.handle;$("queueHandle").textContent=`@${lead.handle}`;
   $("queueMeta").textContent=`${Number(lead.followers).toLocaleString("en-IN")} followers · ${lead.city||lead.category||"India"}`;
-  $("queueAvatar").textContent=firstName(lead)[0]?.toUpperCase()||"C";$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);$("queueDialog").showModal();
+  $("queueAvatar").textContent=firstName(lead)[0]?.toUpperCase()||"C";$("queueCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);$("queueDialog").showModal();
 }
 function currentLead(){ return leads[queueIndex]; }
 function nextPending(){ const pending=pendingLeads(); return pending.find(l=>leads.indexOf(l)>queueIndex)||pending[0]; }
@@ -163,6 +165,7 @@ $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campai
 $("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
+$("queueCompany").addEventListener("change",()=>{state.campaign.brand=$("queueCompany").value;save();const lead=currentLead();$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);showToast(`Switched to ${state.campaign.brand}`);});
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});
