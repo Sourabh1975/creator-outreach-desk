@@ -115,7 +115,7 @@ function render(){
     return `<tr><td><div class="creator"><div class="avatar">${escapeHtml(firstName(l)[0]?.toUpperCase()||"C")}</div><div><strong>${escapeHtml(l.name||l.handle)}</strong><small>@${escapeHtml(l.handle)}</small></div></div></td>
       <td><div class="audience"><strong>${escapeHtml(formatFollowers(l.followers))}</strong><small>${l.followers<10000?"Nano":"Micro"} · ${l.engagement_rate?`${(l.engagement_rate*100).toFixed(1)}% ER`:"ER unavailable"}</small></div></td>
       <td class="contact">${escapeHtml(contactFor(l))}</td><td><span class="status ${status}">${status[0].toUpperCase()+status.slice(1)}</span></td>
-      <td><div class="row-actions"><button class="mini" data-copy="${escapeHtml(l.handle)}">Copy DM</button><button class="mini primary" data-open="${escapeHtml(l.handle)}">Open & review</button></div></td></tr>`;
+      <td><div class="row-actions">${l.public_business_email?`<button class="mini" data-email="${escapeHtml(l.public_business_email)}">Copy email</button>`:""}<button class="mini" data-copy="${escapeHtml(l.handle)}">Copy DM</button><button class="mini primary" data-open="${escapeHtml(l.handle)}">Open & review</button></div></td></tr>`;
   }).join("");
   $("emptyState").hidden=filtered.length>0;
   updateMetrics();
@@ -136,6 +136,7 @@ function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:n
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 
 document.addEventListener("click",async(e)=>{
+  const email=e.target.closest("[data-email]"); if(email) await copyText(email.dataset.email);
   const copy=e.target.closest("[data-copy]"); if(copy){const lead=leadByHandle(copy.dataset.copy);await copyText(messageFor(lead));}
   const open=e.target.closest("[data-open]"); if(open) openQueue(leadByHandle(open.dataset.open));
 });
