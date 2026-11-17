@@ -1,3 +1,5 @@
+import * as XLSX from "./xlsx.mjs";
+
 const STORAGE_KEY = "creator-desk-v1";
 const WA_STORAGE_KEY = "creator-desk-whatsapp-v1";
 const TEMPLATE_VERSION = 5;
@@ -254,6 +256,45 @@ function nextPendingWa(){ const pending=pendingWaContacts();return pending.find(
 function setWaStatus(contact,status){waState.statuses[contact.whatsapp_e164]={status,updatedAt:new Date().toISOString()};saveWa();renderWhatsApp();}
 function openWhatsApp(contact){const message=$("waQueueDialog").open&&currentWaContact()===contact?$("waQueueMessage").value:waMessageFor(contact);window.open(`https://wa.me/${contact.whatsapp_e164}?text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");}
 
+function normaliseIndianPhone(value){
+  let digits=String(value??"").replace(/\D/g,"");
+  if(digits.length===10) digits=`91${digits}`;
+  return /^91[6-9]\d{9}$/.test(digits)?digits:"";
+}
+function displayIndianPhone(digits){return `+91 ${digits.slice(2,7)} ${digits.slice(7)}`;}
+function normaliseImportedContact(contact){
+  const whatsapp_e164=normaliseIndianPhone(contact.whatsapp_e164??contact.whatsapp??contact["WhatsApp"]);
+  const name=String(contact.name??contact["Name"]??"").trim();
+  if(!name||!whatsapp_e164)return null;
+  return {
+    name,
+    instagram_url:String(contact.instagram_url??contact["Instagram profile"]??"").trim(),
+    whatsapp_e164,
+    whatsapp_display:String(contact.whatsapp_display??contact["WhatsApp"]??displayIndianPhone(whatsapp_e164)).trim(),
+    preferred_shade:String(contact.preferred_shade??contact["Preferred shade"]??"").trim(),
+    source:String(contact.source??contact["Source"]??"Imported contact").trim(),
+    source_page:contact.source_page??"",
+    status:String(contact.status??contact["Outreach status"]??"pending").toLowerCase()
+  };
+}
+function contactsFromSpreadsheet(buffer){
+  const workbook=XLSX.read(buffer,{type:"array"});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false});
+  const headerIndex=rows.findIndex(row=>row.some(cell=>String(cell).trim().toLowerCase()==="name")&&row.some(cell=>String(cell).trim().toLowerCase()==="whatsapp"));
+  if(headerIndex<0)throw new Error("Required columns not found");
+  const headers=rows[headerIndex].map(cell=>String(cell).trim());
+  return rows.slice(headerIndex+1).map(row=>Object.fromEntries(headers.map((header,index)=>[header,row[index]??""])));
+}
+async function contactsFromFile(file){
+  if(file.name.toLowerCase().endsWith(".json")){
+    const parsed=JSON.parse(await file.text());
+    if(!Array.isArray(parsed))throw new Error("Invalid JSON file");
+    return parsed;
+  }
+  return contactsFromSpreadsheet(await file.arrayBuffer());
+}
+
 document.addEventListener("click",async(e)=>{
   const compose=e.target.closest("[data-compose]"); if(compose){const lead=leadByHandle(compose.dataset.compose);window.open(gmailComposeUrl(lead),"_blank","noopener,noreferrer");}
   const copy=e.target.closest("[data-copy]"); if(copy){const lead=leadByHandle(copy.dataset.copy);await copyText(messageFor(lead),"Message copied");}
@@ -264,7 +305,7 @@ document.addEventListener("click",async(e)=>{
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
 $("waSearchInput").addEventListener("input",renderWhatsApp);$("waStatusFilter").addEventListener("change",renderWhatsApp);
 $("campaignNav").addEventListener("click",()=>switchView("campaign"));$("whatsappNav").addEventListener("click",()=>switchView("whatsapp"));
-$("waImport").addEventListener("change",async(e)=>{const file=e.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(!Array.isArray(imported))throw new Error("Invalid file");const contacts=imported.filter(contact=>contact.name&&/^91[6-9]\d{9}$/.test(String(contact.whatsapp_e164||"")));if(!contacts.length)throw new Error("No valid contacts");const unique=new Map(contacts.map(contact=>[String(contact.whatsapp_e164),contact]));waState.contacts=[...unique.values()];saveWa();renderWhatsApp();showToast(`${waState.contacts.length} WhatsApp contacts imported`);}catch{showToast("Could not import this contacts file");}finally{e.target.value="";}});
+$("waImport").addEventListener("change",async(e)=>{const file=e.target.files?.[0];if(!file)return;try{const imported=await contactsFromFile(file);const contacts=imported.map(normaliseImportedContact).filter(Boolean);if(!contacts.length)throw new Error("No valid contacts");const unique=new Map(contacts.map(contact=>[contact.whatsapp_e164,contact]));waState.contacts=[...unique.values()];saveWa();renderWhatsApp();showToast(`${waState.contacts.length} WhatsApp contacts imported from ${file.name}`);}catch(error){console.error(error);showToast("Could not import this file. Use the provided Excel or JSON contacts file.");}finally{e.target.value="";}});
 $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
 $("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),offerType:state.campaign.offerType||"exclusive",sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
