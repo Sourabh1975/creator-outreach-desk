@@ -1,5 +1,6 @@
 const STORAGE_KEY = "creator-desk-v1";
-const TEMPLATE_VERSION = 2;
+const TEMPLATE_VERSION = 3;
+const defaultSubject = `{creator_name} × House of Sandhya — Exclusive Collection Proposal`;
 const defaultTemplate = `Hi {first_name},
 
 Greetings from House of Sandhya!
@@ -52,11 +53,12 @@ House of Sandhya
 
 const $ = (id) => document.getElementById(id);
 const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
-  campaign: { brand:"House of Sandhya", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", template:defaultTemplate },
+  campaign: { brand:"House of Sandhya", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", subjectTemplate:defaultSubject, template:defaultTemplate },
   statuses: {}, templateVersion:TEMPLATE_VERSION
 };
 if(state.templateVersion!==TEMPLATE_VERSION){
-  state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",template:defaultTemplate};
+  state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",subjectTemplate:defaultSubject};
+  if(!state.templateVersion||state.templateVersion<2) state.campaign.template=defaultTemplate;
   state.templateVersion=TEMPLATE_VERSION;
   localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
 }
@@ -76,6 +78,11 @@ function messageFor(lead){
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your website]")
     .replaceAll("{website}",c.brandLink||"[Website]").replaceAll("{instagram}",c.instagramHandle||"[Instagram Handle]")
     .replaceAll("{contact_details}",c.contactDetails||"[Contact Details]");
+}
+function subjectFor(lead){
+  const c=state.campaign;
+  return (c.subjectTemplate||defaultSubject).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",lead.name||lead.handle)
+    .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
 function contactFor(lead){
   if(lead.public_business_email) return `Direct: ${lead.public_business_email}`;
@@ -121,7 +128,7 @@ function openQueue(lead){
   if(!lead){showToast("No pending creators left");return;}
   queueIndex=leads.indexOf(lead);$("queueCreatorName").textContent=lead.name||lead.handle;$("queueHandle").textContent=`@${lead.handle}`;
   $("queueMeta").textContent=`${Number(lead.followers).toLocaleString("en-IN")} followers · ${lead.city||lead.category||"India"}`;
-  $("queueAvatar").textContent=firstName(lead)[0]?.toUpperCase()||"C";$("queueMessage").value=messageFor(lead);$("queueDialog").showModal();
+  $("queueAvatar").textContent=firstName(lead)[0]?.toUpperCase()||"C";$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);$("queueDialog").showModal();
 }
 function currentLead(){ return leads[queueIndex]; }
 function nextPending(){ const pending=pendingLeads(); return pending.find(l=>leads.indexOf(l)>queueIndex)||pending[0]; }
@@ -133,11 +140,12 @@ document.addEventListener("click",async(e)=>{
   const open=e.target.closest("[data-open]"); if(open) openQueue(leadByHandle(open.dataset.open));
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
-$("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
-$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
+$("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
+$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value));
+$("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value);openInstagram(lead);});
 $("skipBtn").addEventListener("click",()=>{const lead=currentLead();setStatus(lead,"skipped");openQueue(nextPending());});
 $("markSentBtn").addEventListener("click",()=>{const lead=currentLead();setStatus(lead,"sent");openQueue(nextPending());});
