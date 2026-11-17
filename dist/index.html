@@ -27,7 +27,7 @@
       <div id="campaignView">
       <header class="topbar">
         <div><p class="eyebrow">INFLUENCER MARKETING</p><h1>Women’s fashion outreach</h1></div>
-        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label><label class="home-company"><span>Offer</span><select id="homeOffer"><option value="exclusive">Exclusive collection</option><option value="commission">2% creator opportunity</option><option value="prediction">Creator monetization proposal</option></select></label><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
+        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label><label class="home-company campaign-picker"><span>Campaign</span><select id="homeCampaign"></select></label><button class="button ghost" id="addCampaignBtn">+ Add campaign</button><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
       </header>
 
       <section class="metrics" aria-label="Campaign overview">
@@ -77,8 +77,8 @@
 
   <dialog id="campaignDialog">
     <form method="dialog" id="campaignForm">
-      <div class="dialog-head"><div><p class="eyebrow">CAMPAIGN SETTINGS</p><h2>Personalise your outreach</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
-      <div class="form-grid"><label>Brand name<input id="brandName" required placeholder="House of Sandhya"></label><label>Your name<input id="senderName" required placeholder="Sourabh"></label><label>Collaboration type<select id="collabType"><option>paid</option><option>barter</option><option>paid or barter</option></select></label><label>Website<input id="brandLink" placeholder="https://houseofsandhya.com"></label><label>Instagram handle<input id="instagramHandle" placeholder="@houseofsandhya"></label><label>Contact details<input id="contactDetails" placeholder="Email or WhatsApp number"></label></div>
+      <div class="dialog-head"><div><p class="eyebrow">CAMPAIGN SETTINGS</p><h2 id="campaignDialogTitle">Personalise your outreach</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <div class="form-grid"><label>Campaign name<input id="campaignName" required placeholder="New creator campaign"></label><label>Brand name<input id="brandName" required readonly placeholder="House of Sandhya"></label><label>Your name<input id="senderName" required placeholder="Sourabh"></label><label>Collaboration type<select id="collabType"><option>paid</option><option>barter</option><option>paid or barter</option></select></label><label>Website<input id="brandLink" placeholder="https://houseofsandhya.com"></label><label>Instagram handle<input id="instagramHandle" placeholder="@houseofsandhya"></label><label>Contact details<input id="contactDetails" placeholder="Email or WhatsApp number"></label></div>
       <label>Email subject template<input id="subjectTemplate" placeholder="Exclusive Collection Collaboration Proposal — {brand}"></label>
       <label>Message template<textarea id="messageTemplate" rows="9"></textarea></label>
       <p class="tokens">Available: <code>{first_name}</code> <code>{creator_name}</code> <code>{handle}</code> <code>{brand}</code> <code>{sender}</code> <code>{collab_type}</code> <code>{website}</code> <code>{instagram}</code> <code>{contact_details}</code></p>

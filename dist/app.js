@@ -1,6 +1,6 @@
 const STORAGE_KEY = "creator-desk-v1";
 const WA_STORAGE_KEY = "creator-desk-whatsapp-v1";
-const TEMPLATE_VERSION = 6;
+const TEMPLATE_VERSION = 7;
 const COMPANIES = ["House of Sandhya","Brown Anatomy","Prediction Talk"];
 const defaultSubject = `Exclusive Collection Collaboration Proposal — {brand}`;
 const commissionSubject = `Paid Creator Collaboration Opportunity — Brown Anatomy × Prediction Talk`;
@@ -93,6 +93,7 @@ if(state.templateVersion!==TEMPLATE_VERSION){
 let leads = [];
 let queueIndex = -1;
 let waQueueIndex = -1;
+let campaignEditorMode = "edit";
 
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function saveWa(){ localStorage.setItem(WA_STORAGE_KEY,JSON.stringify(waState)); }
@@ -142,12 +143,54 @@ function ensureCompanyProfiles(){
   const active=safeCompanyProfile(state.companyProfiles[state.campaign.brand],state.campaign.brand);
   state.companyProfiles[state.campaign.brand]=active;Object.assign(state.campaign,active);save();
 }
-function applySelectedCompany(text,selectedCompany){
-  return COMPANIES.reduce((result,company)=>result.replaceAll(company,selectedCompany),text||"");
+function defaultCampaignsFor(company){
+  if(company==="Brown Anatomy") return [
+    {id:"exclusive",name:"Exclusive collection",offerType:"exclusive",subjectTemplate:defaultSubject,template:defaultTemplate},
+    {id:"commission",name:"2% creator opportunity",offerType:"commission",subjectTemplate:commissionSubject,template:commissionTemplate}
+  ];
+  if(company==="Prediction Talk") return [
+    {id:"prediction",name:"Creator monetization proposal",offerType:"prediction",subjectTemplate:predictionTalkSubject,template:predictionTalkTemplate}
+  ];
+  return [{id:"exclusive",name:"Exclusive collection",offerType:"exclusive",subjectTemplate:defaultSubject,template:defaultTemplate}];
+}
+function ensureCampaignLibrary(){
+  if(!state.campaignsByCompany){
+    state.campaignsByCompany=Object.fromEntries(COMPANIES.map(company=>[company,defaultCampaignsFor(company)]));
+    const currentCompany=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:"House of Sandhya";
+    const currentType=state.campaign.offerType||"exclusive";
+    if(currentType==="exclusive"){
+      const record=state.campaignsByCompany[currentCompany].find(item=>item.offerType==="exclusive");
+      if(record){record.subjectTemplate=state.campaign.subjectTemplate||defaultSubject;record.template=state.campaign.template||defaultTemplate;}
+    }
+    state.activeCampaignByCompany=Object.fromEntries(COMPANIES.map(company=>[company,state.campaignsByCompany[company][0].id]));
+    const matching=state.campaignsByCompany[currentCompany].find(item=>item.offerType===currentType);
+    if(matching) state.activeCampaignByCompany[currentCompany]=matching.id;
+  }
+  for(const company of COMPANIES){
+    state.campaignsByCompany[company]||=defaultCampaignsFor(company);
+    state.activeCampaignByCompany||={};
+    if(!state.campaignsByCompany[company].some(item=>item.id===state.activeCampaignByCompany[company])) state.activeCampaignByCompany[company]=state.campaignsByCompany[company][0].id;
+  }
+  save();
+}
+function campaignsFor(company=state.campaign.brand){return state.campaignsByCompany[company]||[];}
+function activeCampaignRecord(company=state.campaign.brand){
+  return campaignsFor(company).find(item=>item.id===state.activeCampaignByCompany[company])||campaignsFor(company)[0];
+}
+function applyCampaignRecord(record){
+  if(!record)return;
+  state.campaign.offerType=record.offerType;
+  state.campaign.subjectTemplate=record.subjectTemplate;
+  state.campaign.template=record.template;
+}
+function renderCampaignOptions(){
+  const records=campaignsFor();
+  $("homeCampaign").innerHTML=records.map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  $("homeCampaign").value=state.activeCampaignByCompany[state.campaign.brand];
 }
 function messageFor(lead){
   const c=state.campaign;
-  const selectedTemplate=c.brand==="Prediction Talk"||c.offerType==="prediction"?predictionTalkTemplate:c.offerType==="commission"?commissionTemplate:applySelectedCompany(c.template,c.brand);
+  const selectedTemplate=c.template||defaultTemplate;
   const message=selectedTemplate.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"")
@@ -157,7 +200,7 @@ function messageFor(lead){
 }
 function subjectFor(lead){
   const c=state.campaign;
-  const selectedSubject=c.brand==="Prediction Talk"||c.offerType==="prediction"?predictionTalkSubject:c.offerType==="commission"?commissionSubject:applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand);
+  const selectedSubject=c.subjectTemplate||defaultSubject;
   return selectedSubject.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
@@ -243,18 +286,26 @@ function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:n
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 function switchCompany(company){
   state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);
-  if(company==="Prediction Talk"){state.campaign.offerType="prediction";$("homeOffer").value="prediction";}
-  else if(state.campaign.offerType==="prediction"||(company!=="Brown Anatomy"&&state.campaign.offerType==="commission")){state.campaign.offerType="exclusive";$("homeOffer").value="exclusive";}
   state.campaign.brand=company;Object.assign(state.campaign,safeCompanyProfile(state.companyProfiles[company],company));save();$("homeCompany").value=company;$("queueCompany").value=company;
+  applyCampaignRecord(activeCampaignRecord(company));renderCampaignOptions();save();
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
   showToast(`Switched to ${company}`);
 }
-function switchOffer(offerType){
-  if(offerType==="commission"&&state.campaign.brand!=="Brown Anatomy") switchCompany("Brown Anatomy");
-  if(offerType==="prediction"&&state.campaign.brand!=="Prediction Talk") switchCompany("Prediction Talk");
-  state.campaign.offerType=offerType;save();$("homeOffer").value=offerType;
+function switchCampaign(campaignId){
+  state.activeCampaignByCompany[state.campaign.brand]=campaignId;
+  applyCampaignRecord(activeCampaignRecord());save();renderCampaignOptions();
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
-  showToast(offerType==="commission"?"2% creator opportunity selected":offerType==="prediction"?"Prediction Talk proposal selected":"Exclusive collection selected");
+  showToast(`${activeCampaignRecord().name} selected`);
+}
+function openCampaignEditor(mode){
+  campaignEditorMode=mode;
+  const record=activeCampaignRecord();
+  $("campaignDialogTitle").textContent=mode==="add"?`Add campaign for ${state.campaign.brand}`:"Edit campaign";
+  $("campaignName").value=mode==="add"?"":record.name;
+  $("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;
+  $("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";
+  $("subjectTemplate").value=record.subjectTemplate||defaultSubject;$("messageTemplate").value=record.template||defaultTemplate;
+  $("saveCampaignBtn").textContent=mode==="add"?"Add campaign":"Save campaign";$("campaignDialog").showModal();
 }
 function switchView(view){
   const whatsapp=view==="whatsapp";$("campaignView").hidden=whatsapp;$("whatsappView").hidden=!whatsapp;
@@ -325,12 +376,27 @@ $("searchInput").addEventListener("input",render);$("statusFilter").addEventList
 $("waSearchInput").addEventListener("input",renderWhatsApp);$("waStatusFilter").addEventListener("change",renderWhatsApp);
 $("campaignNav").addEventListener("click",()=>switchView("campaign"));$("whatsappNav").addEventListener("click",()=>switchView("whatsapp"));
 $("waImport").addEventListener("change",async(e)=>{const file=e.target.files?.[0];if(!file)return;try{const imported=await contactsFromFile(file);const contacts=imported.map(normaliseImportedContact).filter(Boolean);if(!contacts.length)throw new Error("No valid contacts");const unique=new Map(contacts.map(contact=>[contact.whatsapp_e164,contact]));waState.contacts=[...unique.values()];saveWa();renderWhatsApp();showToast(`${waState.contacts.length} WhatsApp contacts imported from ${file.name}`);}catch(error){console.error(error);showToast("Could not import this file. Use the provided Excel or JSON contacts file.");}finally{e.target.value="";}});
-$("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
-$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),offerType:state.campaign.offerType||"exclusive",sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
+$("settingsBtn").addEventListener("click",()=>openCampaignEditor("edit"));
+$("addCampaignBtn").addEventListener("click",()=>openCampaignEditor("add"));
+$("saveCampaignBtn").addEventListener("click",(e)=>{
+  e.preventDefault();
+  const name=$("campaignName").value.trim();if(!name){showToast("Add a campaign name");return;}
+  const company=state.campaign.brand;
+  const subjectTemplate=$("subjectTemplate").value.trim()||defaultSubject;
+  const template=$("messageTemplate").value.trim();
+  state.campaign={...state.campaign,brand:company,sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate,template};
+  if(campaignEditorMode==="add"){
+    const id=`custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
+    campaignsFor(company).push({id,name,offerType:id,subjectTemplate,template});state.activeCampaignByCompany[company]=id;state.campaign.offerType=id;
+  }else{
+    Object.assign(activeCampaignRecord(company),{name,subjectTemplate,template});state.campaign.offerType=activeCampaignRecord(company).offerType;
+  }
+  state.companyProfiles[company]=safeCompanyProfile(profileFromCampaign(),company);state.templateVersion=TEMPLATE_VERSION;save();renderCampaignOptions();$("campaignDialog").close();showToast(campaignEditorMode==="add"?"Campaign added":"Campaign updated");
+});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("homeCompany").addEventListener("change",()=>switchCompany($("homeCompany").value));
-$("homeOffer").addEventListener("change",()=>switchOffer($("homeOffer").value));
+$("homeCampaign").addEventListener("change",()=>switchCampaign($("homeCampaign").value));
 $("queueCompany").addEventListener("change",()=>switchCompany($("queueCompany").value));
 $("startWaQueueBtn").addEventListener("click",()=>openWaQueue(pendingWaContacts()[0]));
 $("closeWaQueueBtn").addEventListener("click",()=>$("waQueueDialog").close());
@@ -348,4 +414,4 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];$("homeOffer").value=state.campaign.offerType;render();renderWhatsApp();
+ensureCompanyProfiles();ensureCampaignLibrary();state.campaign.brand=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];applyCampaignRecord(activeCampaignRecord());leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=state.campaign.brand;$("queueCompany").value=state.campaign.brand;renderCampaignOptions();save();render();renderWhatsApp();
