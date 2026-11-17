@@ -17,6 +17,6 @@ const enriched = leads.map((lead) => ({
 await fs.copyFile(path.join(here, "src", "index.html"), path.join(dist, "index.html"));
 await fs.copyFile(path.join(here, "src", "styles.css"), path.join(dist, "styles.css"));
 await fs.copyFile(path.join(here, "src", "app.js"), path.join(dist, "app.js"));
-await fs.copyFile(path.join(here, "src", "xlsx.mjs"), path.join(dist, "xlsx.mjs"));
+await fs.copyFile(path.join(here, "src", "xlsx.full.min.js"), path.join(dist, "xlsx.full.min.js"));
 await fs.writeFile(path.join(dist, "data", "leads.json"), JSON.stringify(enriched), "utf8");
 console.log(`Built ${enriched.length} creator records into ${dist}`);

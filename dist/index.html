@@ -27,7 +27,7 @@
       <div id="campaignView">
       <header class="topbar">
         <div><p class="eyebrow">INFLUENCER MARKETING</p><h1>Women’s fashion outreach</h1></div>
-        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option></select></label><label class="home-company"><span>Offer</span><select id="homeOffer"><option value="exclusive">Exclusive collection</option><option value="commission">2% creator opportunity</option></select></label><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
+        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label><label class="home-company"><span>Offer</span><select id="homeOffer"><option value="exclusive">Exclusive collection</option><option value="commission">2% creator opportunity</option><option value="prediction">Creator monetization proposal</option></select></label><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
       </header>
 
       <section class="metrics" aria-label="Campaign overview">
@@ -60,7 +60,7 @@
           <article><span>Replies</span><strong id="waReplyMetric">0</strong><small>WhatsApp replies marked</small></article>
           <article class="accent-card"><span>Next action</span><strong id="waRemainingMetric">0</strong><small>contacts remaining</small></article>
         </section>
-        <section class="privacy-note"><strong>Private browser storage</strong><span>Phone numbers are imported from your local JSON file and are never published in the website code. Messages use the company and offer selected on the Campaign page.</span></section>
+        <section class="privacy-note"><strong>Private browser storage</strong><span>Phone numbers are imported from your local Excel or JSON file and are never published in the website code. Messages use the company and offer selected on the Campaign page.</span></section>
         <section class="workspace">
           <div class="workspace-head">
             <div><p class="eyebrow">WHATSAPP PIPELINE</p><h2>Old collaborators</h2></div>
@@ -89,7 +89,7 @@
   <dialog id="queueDialog" class="queue-dialog">
     <div class="dialog-head"><div><p class="eyebrow">OUTREACH QUEUE</p><h2 id="queueCreatorName">Creator</h2></div><button class="icon-button" id="closeQueueBtn" aria-label="Close">×</button></div>
     <div class="queue-profile"><div class="avatar" id="queueAvatar">C</div><div><strong id="queueHandle">@handle</strong><span id="queueMeta">— followers</span></div></div>
-    <label class="company-switch">Send from company<select id="queueCompany"><option>House of Sandhya</option><option>Brown Anatomy</option></select></label>
+    <label class="company-switch">Send from company<select id="queueCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label>
     <label class="subject-field">Personalised email subject<input id="queueSubject" readonly></label>
     <div class="subject-actions"><button class="button secondary" id="copySubjectBtn">Copy subject</button></div>
     <label>Personalised message<textarea id="queueMessage" rows="11"></textarea></label>
@@ -108,6 +108,7 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./xlsx.full.min.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

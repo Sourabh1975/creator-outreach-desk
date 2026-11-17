@@ -1,11 +1,19 @@
-import * as XLSX from "./xlsx.mjs";
-
 const STORAGE_KEY = "creator-desk-v1";
 const WA_STORAGE_KEY = "creator-desk-whatsapp-v1";
-const TEMPLATE_VERSION = 5;
-const COMPANIES = ["House of Sandhya","Brown Anatomy"];
+const TEMPLATE_VERSION = 6;
+const COMPANIES = ["House of Sandhya","Brown Anatomy","Prediction Talk"];
 const defaultSubject = `Exclusive Collection Collaboration Proposal — {brand}`;
 const commissionSubject = `Paid Creator Collaboration Opportunity — Brown Anatomy × Prediction Talk`;
+const predictionTalkSubject = `Creator Monetization Opportunity — Prediction Talk`;
+const predictionTalkTemplate = `Hi there,
+
+We have been following your work and really appreciate the aesthetic and authenticity you bring to your content.
+
+We are reaching out from the Creator Partnerships team at *Prediction Talk*. We are currently onboarding a few select fashion and lifestyle creators for a *high-earning monetization opportunity*—allowing you to generate *recurring income* from your content alongside *brand-funded paid promotion* for your profile.
+
+Would you be open to us sharing the brief proposal here?
+
+Website: https://predictiontalk.com`;
 const commissionTemplate = `Hi {first_name},
 
 We’re currently onboarding 15 creators for a performance-based collaboration with Brown Anatomy and Prediction Talk (predictiontalk.com).
@@ -76,7 +84,7 @@ const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
 const waState = JSON.parse(localStorage.getItem(WA_STORAGE_KEY) || "null") || {contacts:[],statuses:{}};
 state.campaign.offerType=state.campaign.offerType||"exclusive";
 if(state.templateVersion!==TEMPLATE_VERSION){
-  state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",subjectTemplate:defaultSubject};
+  state.campaign={...state.campaign,contactDetails:state.campaign.contactDetails||"",subjectTemplate:state.campaign.subjectTemplate||defaultSubject};
   if(!state.templateVersion||state.templateVersion<2) state.campaign.template=defaultTemplate;
   if(state.templateVersion&&state.templateVersion<5) state.campaign.template=(state.campaign.template||defaultTemplate).replaceAll("House of Sandhya","{brand}");
   state.templateVersion=TEMPLATE_VERSION;
@@ -113,6 +121,10 @@ function profileFromCampaign(){
 function safeCompanyProfile(profile,company){
   const clean={brandLink:profile?.brandLink||"",instagramHandle:profile?.instagramHandle||"",contactDetails:profile?.contactDetails||""};
   if(company==="Brown Anatomy") for(const key of Object.keys(clean)) if(/house\s*of\s*sandhya|houseofsandhya/i.test(clean[key])) clean[key]="";
+  if(company==="Prediction Talk"){
+    if(!clean.brandLink) clean.brandLink="https://predictiontalk.com";
+    if(!clean.instagramHandle) clean.instagramHandle="@predictiontalk_";
+  }
   return clean;
 }
 function ensureCompanyProfiles(){
@@ -120,9 +132,13 @@ function ensureCompanyProfiles(){
     const current=state.campaign.brand;
     state.companyProfiles={
       "House of Sandhya":current==="House of Sandhya"?profileFromCampaign():{brandLink:"",instagramHandle:"@houseofsandhya",contactDetails:""},
-      "Brown Anatomy":current==="Brown Anatomy"?safeCompanyProfile(profileFromCampaign(),"Brown Anatomy"):{brandLink:"",instagramHandle:"",contactDetails:""}
+      "Brown Anatomy":current==="Brown Anatomy"?safeCompanyProfile(profileFromCampaign(),"Brown Anatomy"):{brandLink:"",instagramHandle:"",contactDetails:""},
+      "Prediction Talk":current==="Prediction Talk"?safeCompanyProfile(profileFromCampaign(),"Prediction Talk"):{brandLink:"https://predictiontalk.com",instagramHandle:"@predictiontalk_",contactDetails:""}
     };
   }
+  state.companyProfiles["House of Sandhya"]||={brandLink:"",instagramHandle:"@houseofsandhya",contactDetails:""};
+  state.companyProfiles["Brown Anatomy"]||={brandLink:"",instagramHandle:"",contactDetails:""};
+  state.companyProfiles["Prediction Talk"]||={brandLink:"https://predictiontalk.com",instagramHandle:"@predictiontalk_",contactDetails:""};
   const active=safeCompanyProfile(state.companyProfiles[state.campaign.brand],state.campaign.brand);
   state.companyProfiles[state.campaign.brand]=active;Object.assign(state.campaign,active);save();
 }
@@ -131,7 +147,7 @@ function applySelectedCompany(text,selectedCompany){
 }
 function messageFor(lead){
   const c=state.campaign;
-  const selectedTemplate=c.offerType==="commission"?commissionTemplate:applySelectedCompany(c.template,c.brand);
+  const selectedTemplate=c.brand==="Prediction Talk"||c.offerType==="prediction"?predictionTalkTemplate:c.offerType==="commission"?commissionTemplate:applySelectedCompany(c.template,c.brand);
   const message=selectedTemplate.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"")
@@ -141,7 +157,7 @@ function messageFor(lead){
 }
 function subjectFor(lead){
   const c=state.campaign;
-  const selectedSubject=c.offerType==="commission"?commissionSubject:applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand);
+  const selectedSubject=c.brand==="Prediction Talk"||c.offerType==="prediction"?predictionTalkSubject:c.offerType==="commission"?commissionSubject:applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand);
   return selectedSubject.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
@@ -227,16 +243,18 @@ function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:n
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 function switchCompany(company){
   state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);
-  if(company!=="Brown Anatomy"&&state.campaign.offerType==="commission"){state.campaign.offerType="exclusive";$("homeOffer").value="exclusive";}
+  if(company==="Prediction Talk"){state.campaign.offerType="prediction";$("homeOffer").value="prediction";}
+  else if(state.campaign.offerType==="prediction"||(company!=="Brown Anatomy"&&state.campaign.offerType==="commission")){state.campaign.offerType="exclusive";$("homeOffer").value="exclusive";}
   state.campaign.brand=company;Object.assign(state.campaign,safeCompanyProfile(state.companyProfiles[company],company));save();$("homeCompany").value=company;$("queueCompany").value=company;
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
   showToast(`Switched to ${company}`);
 }
 function switchOffer(offerType){
   if(offerType==="commission"&&state.campaign.brand!=="Brown Anatomy") switchCompany("Brown Anatomy");
+  if(offerType==="prediction"&&state.campaign.brand!=="Prediction Talk") switchCompany("Prediction Talk");
   state.campaign.offerType=offerType;save();$("homeOffer").value=offerType;
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
-  showToast(offerType==="commission"?"2% creator opportunity selected":"Exclusive collection selected");
+  showToast(offerType==="commission"?"2% creator opportunity selected":offerType==="prediction"?"Prediction Talk proposal selected":"Exclusive collection selected");
 }
 function switchView(view){
   const whatsapp=view==="whatsapp";$("campaignView").hidden=whatsapp;$("whatsappView").hidden=!whatsapp;
@@ -278,9 +296,10 @@ function normaliseImportedContact(contact){
   };
 }
 function contactsFromSpreadsheet(buffer){
-  const workbook=XLSX.read(buffer,{type:"array"});
+  if(!window.XLSX)throw new Error("Excel reader unavailable");
+  const workbook=window.XLSX.read(buffer,{type:"array"});
   const sheet=workbook.Sheets[workbook.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false});
+  const rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false});
   const headerIndex=rows.findIndex(row=>row.some(cell=>String(cell).trim().toLowerCase()==="name")&&row.some(cell=>String(cell).trim().toLowerCase()==="whatsapp"));
   if(headerIndex<0)throw new Error("Required columns not found");
   const headers=rows[headerIndex].map(cell=>String(cell).trim());
