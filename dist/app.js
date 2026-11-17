@@ -89,6 +89,7 @@ function contactFor(lead){
   if(lead.platform_relay_email) return `Relay: ${lead.platform_relay_email}`;
   return "Instagram DM";
 }
+function emailFor(lead){ return lead.public_business_email || lead.platform_relay_email || ""; }
 function formatFollowers(n){ return Intl.NumberFormat("en-IN",{notation:n>=1000?"compact":"standard",maximumFractionDigits:1}).format(n||0); }
 function escapeHtml(value){ return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c])); }
 
@@ -115,13 +116,13 @@ function render(){
     return `<tr><td><div class="creator"><div class="avatar">${escapeHtml(firstName(l)[0]?.toUpperCase()||"C")}</div><div><strong>${escapeHtml(l.name||l.handle)}</strong><small>@${escapeHtml(l.handle)}</small></div></div></td>
       <td><div class="audience"><strong>${escapeHtml(formatFollowers(l.followers))}</strong><small>${l.followers<10000?"Nano":"Micro"} · ${l.engagement_rate?`${(l.engagement_rate*100).toFixed(1)}% ER`:"ER unavailable"}</small></div></td>
       <td class="contact">${escapeHtml(contactFor(l))}</td><td><span class="status ${status}">${status[0].toUpperCase()+status.slice(1)}</span></td>
-      <td><div class="row-actions">${l.public_business_email?`<button class="mini" data-email="${escapeHtml(l.public_business_email)}">Copy email</button>`:""}<button class="mini" data-copy="${escapeHtml(l.handle)}">Copy DM</button><button class="mini primary" data-open="${escapeHtml(l.handle)}">Open & review</button></div></td></tr>`;
+      <td><div class="row-actions">${emailFor(l)?`<button class="mini" data-email="${escapeHtml(emailFor(l))}">Copy email</button>`:""}<button class="mini" data-copy="${escapeHtml(l.handle)}">Copy DM</button><button class="mini primary" data-open="${escapeHtml(l.handle)}">Open & review</button></div></td></tr>`;
   }).join("");
   $("emptyState").hidden=filtered.length>0;
   updateMetrics();
 }
 function showToast(text){ const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(showToast.t);showToast.t=setTimeout(()=>el.classList.remove("show"),1800); }
-async function copyText(text){ try{await navigator.clipboard.writeText(text);showToast("Personalised message copied");return true;}catch{showToast("Copy failed — select the message manually");return false;} }
+async function copyText(text,successMessage="Copied"){ try{await navigator.clipboard.writeText(text);showToast(successMessage);return true;}catch{showToast("Copy failed — select the text manually");return false;} }
 function leadByHandle(handle){ return leads.find(l=>l.handle===handle); }
 function pendingLeads(){ return leads.filter(l=>statusOf(l.handle)==="pending"); }
 function openQueue(lead){
@@ -136,8 +137,8 @@ function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:n
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 
 document.addEventListener("click",async(e)=>{
-  const email=e.target.closest("[data-email]"); if(email) await copyText(email.dataset.email);
-  const copy=e.target.closest("[data-copy]"); if(copy){const lead=leadByHandle(copy.dataset.copy);await copyText(messageFor(lead));}
+  const email=e.target.closest("[data-email]"); if(email) await copyText(email.dataset.email,"Email copied");
+  const copy=e.target.closest("[data-copy]"); if(copy){const lead=leadByHandle(copy.dataset.copy);await copyText(messageFor(lead),"Message copied");}
   const open=e.target.closest("[data-open]"); if(open) openQueue(leadByHandle(open.dataset.open));
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
@@ -145,9 +146,9 @@ $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campai
 $("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
-$("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value));
-$("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value));
-$("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value);openInstagram(lead);});
+$("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
+$("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
+$("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});
 $("skipBtn").addEventListener("click",()=>{const lead=currentLead();setStatus(lead,"skipped");openQueue(nextPending());});
 $("markSentBtn").addEventListener("click",()=>{const lead=currentLead();setStatus(lead,"sent");openQueue(nextPending());});
 $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setStatus(lead,"replied");openQueue(nextPending());});
