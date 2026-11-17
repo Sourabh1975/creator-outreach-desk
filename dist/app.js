@@ -154,6 +154,11 @@ function currentLead(){ return leads[queueIndex]; }
 function nextPending(){ const pending=pendingLeads(); return pending.find(l=>leads.indexOf(l)>queueIndex)||pending[0]; }
 function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:new Date().toISOString()};save();render(); }
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
+function switchCompany(company){
+  state.campaign.brand=company;save();$("homeCompany").value=company;$("queueCompany").value=company;
+  const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
+  showToast(`Switched to ${company}`);
+}
 
 document.addEventListener("click",async(e)=>{
   const compose=e.target.closest("[data-compose]"); if(compose){const lead=leadByHandle(compose.dataset.compose);window.open(gmailComposeUrl(lead),"_blank","noopener,noreferrer");}
@@ -165,7 +170,8 @@ $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campai
 $("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
-$("queueCompany").addEventListener("change",()=>{state.campaign.brand=$("queueCompany").value;save();const lead=currentLead();$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);showToast(`Switched to ${state.campaign.brand}`);});
+$("homeCompany").addEventListener("change",()=>switchCompany($("homeCompany").value));
+$("queueCompany").addEventListener("change",()=>switchCompany($("queueCompany").value));
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});
@@ -175,4 +181,4 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-leads=await fetch("./data/leads.json").then(r=>r.json());render();
+leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];render();
