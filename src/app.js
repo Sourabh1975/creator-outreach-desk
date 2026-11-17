@@ -86,9 +86,12 @@ function creatorIdentity(lead){
 }
 function firstName(lead){ return creatorIdentity(lead).firstName; }
 function creatorName(lead){ return creatorIdentity(lead).creatorName; }
+function applySelectedCompany(text,selectedCompany){
+  return COMPANIES.reduce((result,company)=>result.replaceAll(company,selectedCompany),text||"");
+}
 function messageFor(lead){
   const c=state.campaign;
-  return c.template.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
+  return applySelectedCompany(c.template,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"[add your website]")
     .replaceAll("{website}",c.brandLink||"[Website]").replaceAll("{instagram}",c.instagramHandle||"[Instagram Handle]")
@@ -96,7 +99,7 @@ function messageFor(lead){
 }
 function subjectFor(lead){
   const c=state.campaign;
-  return (c.subjectTemplate||defaultSubject).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
+  return applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
 function contactFor(lead){
