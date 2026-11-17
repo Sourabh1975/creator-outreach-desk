@@ -2,6 +2,19 @@ const STORAGE_KEY = "creator-desk-v1";
 const TEMPLATE_VERSION = 5;
 const COMPANIES = ["House of Sandhya","Brown Anatomy"];
 const defaultSubject = `Exclusive Collection Collaboration Proposal — {brand}`;
+const commissionSubject = `Paid Creator Collaboration Opportunity — Brown Anatomy × Prediction Talk`;
+const commissionTemplate = `Hi {first_name},
+
+We’re currently onboarding 15 creators for a performance-based collaboration with Brown Anatomy and Prediction Talk (predictiontalk.com).
+
+You will receive a 2% commission on the total value of all orders generated through your promotion. The more orders you generate, the more you earn—there is no fixed earning limit.
+
+This is a great opportunity to build a long-term association with both brands while earning through your performance.
+
+If you’re interested, please reply here. I’ll forward your profile to our team, and they will connect with you to explain the collaboration, payment structure, and next steps.
+
+Warm regards,
+Team Brown Anatomy & Prediction Talk`;
 const defaultTemplate = `Hi {first_name},
 
 Greetings from {brand}!
@@ -54,9 +67,10 @@ Team {brand}
 
 const $ = (id) => document.getElementById(id);
 const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || {
-  campaign: { brand:"House of Sandhya", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", subjectTemplate:defaultSubject, template:defaultTemplate },
+  campaign: { brand:"House of Sandhya", offerType:"exclusive", sender:"Sourabh", collabType:"paid or barter", brandLink:"", instagramHandle:"@houseofsandhya", contactDetails:"", subjectTemplate:defaultSubject, template:defaultTemplate },
   statuses: {}, templateVersion:TEMPLATE_VERSION
 };
+state.campaign.offerType=state.campaign.offerType||"exclusive";
 if(state.templateVersion!==TEMPLATE_VERSION){
   state.campaign={...state.campaign,brand:"House of Sandhya",instagramHandle:state.campaign.instagramHandle||"@houseofsandhya",contactDetails:state.campaign.contactDetails||"",subjectTemplate:defaultSubject};
   if(!state.templateVersion||state.templateVersion<2) state.campaign.template=defaultTemplate;
@@ -110,7 +124,8 @@ function applySelectedCompany(text,selectedCompany){
 }
 function messageFor(lead){
   const c=state.campaign;
-  const message=applySelectedCompany(c.template,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
+  const selectedTemplate=c.offerType==="commission"?commissionTemplate:applySelectedCompany(c.template,c.brand);
+  const message=selectedTemplate.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender)
     .replaceAll("{collab_type}",c.collabType).replaceAll("{brand_link}",c.brandLink||"")
     .replaceAll("{website}",c.brandLink||"").replaceAll("{instagram}",c.instagramHandle||"")
@@ -119,7 +134,8 @@ function messageFor(lead){
 }
 function subjectFor(lead){
   const c=state.campaign;
-  return applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand).replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
+  const selectedSubject=c.offerType==="commission"?commissionSubject:applySelectedCompany(c.subjectTemplate||defaultSubject,c.brand);
+  return selectedSubject.replaceAll("{first_name}",firstName(lead)).replaceAll("{creator_name}",creatorName(lead))
     .replaceAll("{handle}",lead.handle).replaceAll("{brand}",c.brand).replaceAll("{sender}",c.sender);
 }
 function contactFor(lead){
@@ -179,9 +195,16 @@ function setStatus(lead,status){ state.statuses[lead.handle]={status,updatedAt:n
 function openInstagram(lead){ window.open(lead.profile_url||`https://www.instagram.com/${lead.handle}/`,`_blank`,`noopener,noreferrer`); }
 function switchCompany(company){
   state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);
+  if(company!=="Brown Anatomy"&&state.campaign.offerType==="commission"){state.campaign.offerType="exclusive";$("homeOffer").value="exclusive";}
   state.campaign.brand=company;Object.assign(state.campaign,safeCompanyProfile(state.companyProfiles[company],company));save();$("homeCompany").value=company;$("queueCompany").value=company;
   const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
   showToast(`Switched to ${company}`);
+}
+function switchOffer(offerType){
+  if(offerType==="commission"&&state.campaign.brand!=="Brown Anatomy") switchCompany("Brown Anatomy");
+  state.campaign.offerType=offerType;save();$("homeOffer").value=offerType;
+  const lead=currentLead();if(lead&&$("queueDialog").open){$("queueSubject").value=subjectFor(lead);$("queueMessage").value=messageFor(lead);}
+  showToast(offerType==="commission"?"2% creator opportunity selected":"Exclusive collection selected");
 }
 
 document.addEventListener("click",async(e)=>{
@@ -191,10 +214,11 @@ document.addEventListener("click",async(e)=>{
 });
 $("searchInput").addEventListener("input",render);$("statusFilter").addEventListener("change",render);
 $("settingsBtn").addEventListener("click",()=>{$("brandName").value=state.campaign.brand;$("senderName").value=state.campaign.sender;$("collabType").value=state.campaign.collabType;$("brandLink").value=state.campaign.brandLink;$("instagramHandle").value=state.campaign.instagramHandle||"";$("contactDetails").value=state.campaign.contactDetails||"";$("subjectTemplate").value=state.campaign.subjectTemplate||defaultSubject;$("messageTemplate").value=state.campaign.template;$("campaignDialog").showModal();});
-$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
+$("saveCampaignBtn").addEventListener("click",(e)=>{e.preventDefault();state.campaign={brand:$("brandName").value.trim(),offerType:state.campaign.offerType||"exclusive",sender:$("senderName").value.trim(),collabType:$("collabType").value,brandLink:$("brandLink").value.trim(),instagramHandle:$("instagramHandle").value.trim(),contactDetails:$("contactDetails").value.trim(),subjectTemplate:$("subjectTemplate").value.trim()||defaultSubject,template:$("messageTemplate").value};state.companyProfiles[state.campaign.brand]=safeCompanyProfile(profileFromCampaign(),state.campaign.brand);state.templateVersion=TEMPLATE_VERSION;save();$("campaignDialog").close();showToast("Campaign settings saved");});
 $("startQueueBtn").addEventListener("click",()=>openQueue(pendingLeads()[0]));
 $("closeQueueBtn").addEventListener("click",()=>$("queueDialog").close());
 $("homeCompany").addEventListener("change",()=>switchCompany($("homeCompany").value));
+$("homeOffer").addEventListener("change",()=>switchOffer($("homeOffer").value));
 $("queueCompany").addEventListener("change",()=>switchCompany($("queueCompany").value));
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
@@ -205,4 +229,4 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];render();
+ensureCompanyProfiles();leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];$("homeOffer").value=state.campaign.offerType;render();
