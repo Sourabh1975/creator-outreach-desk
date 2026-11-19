@@ -1048,6 +1048,226 @@ $("waQueueStartAutoBtn").addEventListener("click", () => {
   openWaAutoDialog();
 });
 
+// --- GMAIL AUTO-PILOT / AUTO-SEND QUEUE ---
+let emailAutoQueue = [];
+let emailAutoTotal = 0;
+let emailAutoIndex = 0;
+let emailAutoRunning = false;
+let emailAutoPaused = false;
+let emailAutoTimerId = null;
+let emailAutoCountdownRemaining = 0;
+
+function addEmailAutoLog(text, type = ""){
+  const list = $("emailLogList");
+  if(!list) return;
+  const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const entry = document.createElement("div");
+  entry.className = `auto-log-entry ${type}`;
+  entry.textContent = `[${time}] ${text}`;
+  list.appendChild(entry);
+  list.scrollTop = list.scrollHeight;
+}
+
+function updateEmailAutoCurrentDisplay(lead){
+  if(!lead){
+    $("emailCreatorName").textContent = "Email Queue Completed";
+    $("emailCreatorMeta").textContent = "All email creators processed";
+    $("emailAvatar").textContent = "✓";
+    $("emailStatusHint").textContent = "All creators with email addresses have been sent proposals!";
+    return;
+  }
+  const email = emailFor(lead);
+  $("emailCreatorName").textContent = lead.name || `@${lead.handle}`;
+  $("emailCreatorMeta").textContent = `@${lead.handle} • ${email}`;
+  $("emailAvatar").textContent = firstName(lead)[0]?.toUpperCase() || "C";
+  $("emailStatusHint").innerHTML = `Gmail compose opening for <strong>${escapeHtml(lead.name || lead.handle)}</strong> (${escapeHtml(email)}). With the extension active, Gmail will auto-send and close the tab!`;
+}
+
+function openEmailAutoDialog(){
+  const records = campaignsFor();
+  $("emailAutoCampaignSelect").innerHTML = records.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  $("emailAutoCampaignSelect").value = state.activeCampaignByCompany[state.campaign.brand];
+
+  emailAutoQueue = leads.filter(l => emailFor(l) && statusOf(l.handle) === "pending");
+  emailAutoTotal = emailAutoQueue.length;
+  emailAutoIndex = 0;
+  emailAutoRunning = false;
+  emailAutoPaused = false;
+  clearInterval(emailAutoTimerId);
+
+  $("emailProgressLabel").textContent = "Ready to start";
+  $("emailProgressCount").textContent = `0 / ${emailAutoTotal} sent`;
+  $("emailProgressBar").style.width = "0%";
+  $("emailCountdownBadge").hidden = true;
+
+  $("emailRunBtn").style.display = "inline-block";
+  $("emailRunBtn").textContent = "▶ Start Email Auto-Send Loop";
+  $("emailRunBtn").disabled = emailAutoTotal === 0;
+  $("emailPauseBtn").style.display = "none";
+  $("emailPauseBtn").disabled = true;
+  $("emailStopBtn").disabled = true;
+  $("emailSkipBtn").disabled = true;
+
+  const logList = $("emailLogList");
+  logList.innerHTML = `<div class="auto-log-entry">Found ${emailAutoTotal} creators with email addresses ready for outreach.</div>`;
+
+  if(emailAutoQueue.length > 0){
+    updateEmailAutoCurrentDisplay(emailAutoQueue[0]);
+  } else {
+    updateEmailAutoCurrentDisplay(null);
+  }
+
+  $("emailAutoDialog").showModal();
+}
+
+function stopEmailAutoLoop(){
+  emailAutoRunning = false;
+  emailAutoPaused = false;
+  clearInterval(emailAutoTimerId);
+  $("emailCountdownBadge").hidden = true;
+  $("emailRunBtn").style.display = "inline-block";
+  $("emailRunBtn").textContent = "▶ Start Email Auto-Send Loop";
+  $("emailRunBtn").disabled = emailAutoQueue.length === 0;
+  $("emailPauseBtn").style.display = "none";
+  $("emailStopBtn").disabled = true;
+  $("emailSkipBtn").disabled = true;
+  $("emailProgressLabel").textContent = "Stopped";
+  addEmailAutoLog("⏹ Gmail auto-send loop stopped");
+  showToast("Gmail auto-send stopped");
+}
+
+function pauseEmailAutoLoop(){
+  if(!emailAutoRunning) return;
+  if(emailAutoPaused){
+    emailAutoPaused = false;
+    $("emailPauseBtn").textContent = "Pause";
+    $("emailProgressLabel").textContent = "Sending in progress...";
+    addEmailAutoLog("▶ Resumed Gmail loop");
+    startNextEmailCountdown();
+  } else {
+    emailAutoPaused = true;
+    clearInterval(emailAutoTimerId);
+    $("emailPauseBtn").textContent = "▶ Resume";
+    $("emailProgressLabel").textContent = "Paused";
+    addEmailAutoLog("⏸ Paused Gmail loop");
+  }
+}
+
+function skipEmailAutoCurrent(){
+  if(!emailAutoRunning) return;
+  clearInterval(emailAutoTimerId);
+  addEmailAutoLog("⏭ Skipped timer, advancing to next creator immediately...");
+  processNextEmailContact();
+}
+
+function startNextEmailCountdown(){
+  clearInterval(emailAutoTimerId);
+  if(emailAutoQueue.length === 0){
+    finishEmailAutoLoop();
+    return;
+  }
+  const delaySec = parseInt($("emailAutoDelay").value, 10) || 10;
+  emailAutoCountdownRemaining = delaySec;
+  $("emailCountdownBadge").hidden = false;
+  $("emailCountdownSec").textContent = `Next in ${emailAutoCountdownRemaining}s`;
+
+  emailAutoTimerId = setInterval(() => {
+    if(emailAutoPaused) return;
+    emailAutoCountdownRemaining--;
+    if(emailAutoCountdownRemaining > 0){
+      $("emailCountdownSec").textContent = `Next in ${emailAutoCountdownRemaining}s`;
+    } else {
+      clearInterval(emailAutoTimerId);
+      $("emailCountdownBadge").hidden = true;
+      processNextEmailContact();
+    }
+  }, 1000);
+}
+
+function processNextEmailContact(){
+  if(!emailAutoRunning || emailAutoPaused) return;
+  if(emailAutoQueue.length === 0){
+    finishEmailAutoLoop();
+    return;
+  }
+
+  const lead = emailAutoQueue.shift();
+  emailAutoIndex++;
+
+  updateEmailAutoCurrentDisplay(lead);
+
+  const url = gmailComposeUrl(lead);
+  window.open(url, "_blank");
+
+  setStatus(lead, "sent");
+
+  const pct = Math.round((emailAutoIndex / emailAutoTotal) * 100);
+  $("emailProgressBar").style.width = `${pct}%`;
+  $("emailProgressCount").textContent = `${emailAutoIndex} / ${emailAutoTotal} sent (${pct}%)`;
+  $("emailProgressLabel").textContent = `Sending (${pct}%)`;
+
+  addEmailAutoLog(`✓ [${emailAutoIndex}/${emailAutoTotal}] Opened Gmail for ${lead.name || lead.handle} (${emailFor(lead)})`, "success");
+
+  if(emailAutoQueue.length > 0){
+    startNextEmailCountdown();
+  } else {
+    finishEmailAutoLoop();
+  }
+}
+
+function finishEmailAutoLoop(){
+  emailAutoRunning = false;
+  emailAutoPaused = false;
+  clearInterval(emailAutoTimerId);
+  $("emailCountdownBadge").hidden = true;
+  $("emailProgressBar").style.width = "100%";
+  $("emailProgressLabel").textContent = "Completed!";
+  $("emailProgressCount").textContent = `${emailAutoIndex} / ${emailAutoTotal} sent (100%)`;
+  $("emailRunBtn").style.display = "inline-block";
+  $("emailRunBtn").textContent = "Completed";
+  $("emailRunBtn").disabled = true;
+  $("emailPauseBtn").style.display = "none";
+  $("emailStopBtn").disabled = true;
+  $("emailSkipBtn").disabled = true;
+  updateEmailAutoCurrentDisplay(null);
+  addEmailAutoLog(`🎉 All ${emailAutoTotal} email creators completed!`, "success");
+  showToast("Gmail Auto-Send loop completed successfully!");
+}
+
+function startEmailAutoLoop(){
+  if(emailAutoQueue.length === 0){
+    showToast("No pending email creators in queue!");
+    return;
+  }
+  emailAutoRunning = true;
+  emailAutoPaused = false;
+  $("emailRunBtn").style.display = "none";
+  $("emailPauseBtn").style.display = "inline-block";
+  $("emailPauseBtn").disabled = false;
+  $("emailPauseBtn").textContent = "Pause";
+  $("emailStopBtn").disabled = false;
+  $("emailSkipBtn").disabled = false;
+  $("emailProgressLabel").textContent = "Starting...";
+  addEmailAutoLog("🚀 Starting Gmail Auto-Send loop...");
+  processNextEmailContact();
+}
+
+$("startEmailAutoBtn").addEventListener("click", openEmailAutoDialog);
+$("closeEmailAutoBtn").addEventListener("click", () => {
+  if(emailAutoRunning && !confirm("Gmail auto-send is currently running. Stop and close?")) return;
+  stopEmailAutoLoop();
+  $("emailAutoDialog").close();
+});
+$("emailRunBtn").addEventListener("click", startEmailAutoLoop);
+$("emailPauseBtn").addEventListener("click", pauseEmailAutoLoop);
+$("emailStopBtn").addEventListener("click", stopEmailAutoLoop);
+$("emailSkipBtn").addEventListener("click", skipEmailAutoCurrent);
+$("emailAutoCampaignSelect").addEventListener("change", () => switchCampaign($("emailAutoCampaignSelect").value));
+$("queueStartEmailAutoBtn").addEventListener("click", () => {
+  $("queueDialog").close();
+  openEmailAutoDialog();
+});
+
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});

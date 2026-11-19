@@ -27,7 +27,7 @@
       <div id="campaignView">
       <header class="topbar">
         <div><p class="eyebrow">INFLUENCER MARKETING</p><h1>Women’s fashion outreach</h1></div>
-        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label><label class="home-company campaign-picker"><span>Campaign</span><select id="homeCampaign"></select></label><button class="button ghost" id="addCampaignBtn">+ Add campaign</button><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button primary" id="startQueueBtn">Start outreach queue <span>→</span></button></div>
+        <div class="queue-actions"><label class="home-company"><span>Company</span><select id="homeCompany"><option>House of Sandhya</option><option>Brown Anatomy</option><option>Prediction Talk</option></select></label><label class="home-company campaign-picker"><span>Campaign</span><select id="homeCampaign"></select></label><button class="button ghost" id="addCampaignBtn">+ Add campaign</button><button class="button ghost" id="settingsBtn">Edit campaign</button><button class="button secondary" id="startQueueBtn">Review queue <span>→</span></button><button class="button primary" id="startEmailAutoBtn">⚡ Auto-Send Email loop (Send All)</button></div>
       </header>
 
       <section class="metrics" aria-label="Campaign overview">
@@ -102,7 +102,11 @@
     <label>Personalised message<textarea id="queueMessage" rows="11"></textarea></label>
     <div class="queue-buttons"><button class="button ghost" id="skipBtn">Skip</button><button class="button secondary" id="copyBtn">Copy message</button><button class="button primary" id="openInstagramBtn">Copy message + open Instagram ↗</button></div>
     <p class="queue-help">Review the message in Instagram and press Send yourself. Then mark the result here.</p>
-    <div class="result-buttons"><button id="markSentBtn">✓ Mark sent & next</button><button id="markRepliedBtn">★ Mark replied</button></div>
+    <div class="result-buttons">
+      <button id="markSentBtn">✓ Mark sent & next</button>
+      <button id="markRepliedBtn">★ Mark replied</button>
+      <button type="button" id="queueStartEmailAutoBtn" style="margin-left:auto; color:var(--plum); font-weight:700;">⚡ Start Email Auto-Send from here</button>
+    </div>
   </dialog>
 
   <dialog id="waQueueDialog" class="queue-dialog">
@@ -247,6 +251,73 @@
       <button type="button" class="button secondary" id="autoPauseBtn" disabled>Pause</button>
       <button type="button" class="button ghost" id="autoSkipBtn" disabled>Skip current</button>
       <button type="button" class="button primary" id="autoRunBtn">▶ Start Auto-Send Loop</button>
+    </div>
+  </dialog>
+
+  <dialog id="emailAutoDialog" class="queue-dialog auto-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">AUTOMATED EMAIL OUTREACH</p>
+        <h2>Gmail Auto-Send Loop</h2>
+      </div>
+      <button type="button" class="icon-button" id="closeEmailAutoBtn" aria-label="Close">×</button>
+    </div>
+
+    <div class="auto-config-box">
+      <div class="auto-config-row">
+        <label class="wa-template-dropdown-label" for="emailAutoCampaignSelect">
+          <span>Campaign:</span>
+          <select id="emailAutoCampaignSelect"></select>
+        </label>
+        <label class="auto-delay-label" for="emailAutoDelay">
+          <span>Delay between emails:</span>
+          <select id="emailAutoDelay">
+            <option value="6">6 seconds (Fast)</option>
+            <option value="10" selected>10 seconds (Recommended)</option>
+            <option value="15">15 seconds (Safe)</option>
+            <option value="20">20 seconds (Ultra safe)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="auto-status-card">
+      <div class="auto-progress-header">
+        <span id="emailProgressLabel">Ready to start</span>
+        <strong id="emailProgressCount">0 / 0 sent</strong>
+      </div>
+      <div class="auto-progress-bar-bg">
+        <div class="auto-progress-bar-fill" id="emailProgressBar" style="width: 0%;"></div>
+      </div>
+      
+      <div class="auto-current-creator" id="emailCurrentCard">
+        <div class="avatar" id="emailAvatar">C</div>
+        <div class="auto-creator-info">
+          <strong id="emailCreatorName">Creator Name</strong>
+          <span id="emailCreatorMeta">@handle • email@domain.com</span>
+        </div>
+        <div class="auto-countdown-badge" id="emailCountdownBadge" hidden>
+          <span id="emailCountdownSec">10s</span>
+        </div>
+      </div>
+
+      <div class="auto-status-hint" id="emailStatusHint">
+        Click <strong>Start Email Auto-Send Loop</strong> below. Gmail opens in a tab with recipient, subject, and proposal pre-filled. With Creator Desk Chrome Extension active, Gmail auto-sends and closes the tab automatically!
+      </div>
+    </div>
+
+    <div class="auto-log-wrap">
+      <div class="auto-log-title">Live Gmail Activity Log</div>
+      <div class="auto-log-list" id="emailLogList">
+        <div class="auto-log-entry">Queue loaded. Click Start to begin email outreach loop.</div>
+      </div>
+    </div>
+
+    <div class="dialog-actions auto-actions">
+      <button type="button" class="button ghost danger" id="emailStopBtn" style="color:#a83232;" disabled>Stop</button>
+      <button type="button" class="button secondary" id="emailPauseBtn" disabled>Pause</button>
+      <button type="button" class="button ghost" id="emailSkipBtn" disabled>Skip current</button>
+      <button type="button" class="button primary" id="emailRunBtn">▶ Start Email Auto-Send Loop</button>
     </div>
   </dialog>
 
