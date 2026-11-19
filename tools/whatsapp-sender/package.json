@@ -1,0 +1,13 @@
+{
+  "name": "whatsapp-sender",
+  "version": "1.0.0",
+  "description": "",
+  "main": "send_messages.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node send_messages.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.18.1"
+  }
+}

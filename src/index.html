@@ -57,7 +57,8 @@
             <button class="button ghost" id="waAddTemplateBtn">+ Add template</button>
             <button class="button ghost" id="waEditTemplateBtn">Edit template</button>
             <label class="button ghost file-button">Import Excel / JSON<input id="waImport" type="file" accept=".xlsx,.xls,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json,text/csv" hidden></label>
-            <button class="button primary" id="startWaQueueBtn">Start WhatsApp queue <span>→</span></button>
+            <button class="button secondary" id="startWaQueueBtn">Review queue <span>→</span></button>
+            <button class="button primary" id="startWaAutoBtn">⚡ Auto-Send loop (Send All)</button>
           </div>
         </header>
         <section class="metrics" aria-label="WhatsApp outreach overview">
@@ -144,7 +145,11 @@
 
     <div class="queue-buttons"><button class="button ghost" id="waSkipBtn">Skip</button><button class="button secondary" id="waCopyBtn">Copy message</button><button class="button primary" id="openWhatsAppBtn">Open WhatsApp ↗</button></div>
     <p class="queue-help">WhatsApp opens with the message filled in. Review it and press Send yourself, then mark the result here.</p>
-    <div class="result-buttons"><button id="waMarkSentBtn">✓ Mark sent & next</button><button id="waMarkRepliedBtn">★ Mark replied</button></div>
+    <div class="result-buttons">
+      <button id="waMarkSentBtn">✓ Mark sent & next</button>
+      <button id="waMarkRepliedBtn">★ Mark replied</button>
+      <button type="button" id="waQueueStartAutoBtn" style="margin-left:auto; color:var(--plum); font-weight:700;">⚡ Start Auto-Send from here</button>
+    </div>
   </dialog>
 
   <dialog id="waTemplateDialog">
@@ -176,6 +181,73 @@
         </div>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="waAutoDialog" class="queue-dialog auto-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">AUTOMATED QUEUE</p>
+        <h2>WhatsApp Auto-Send Loop</h2>
+      </div>
+      <button type="button" class="icon-button" id="closeWaAutoBtn" aria-label="Close">×</button>
+    </div>
+
+    <div class="auto-config-box">
+      <div class="auto-config-row">
+        <label class="wa-template-dropdown-label" for="waAutoTemplateSelect">
+          <span>Template:</span>
+          <select id="waAutoTemplateSelect"></select>
+        </label>
+        <label class="auto-delay-label" for="waAutoDelay">
+          <span>Delay between sends:</span>
+          <select id="waAutoDelay">
+            <option value="6">6 seconds (Fast)</option>
+            <option value="10" selected>10 seconds (Recommended)</option>
+            <option value="15">15 seconds (Safe)</option>
+            <option value="20">20 seconds (Ultra safe)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="auto-status-card">
+      <div class="auto-progress-header">
+        <span id="autoProgressLabel">Ready to start</span>
+        <strong id="autoProgressCount">0 / 0 sent</strong>
+      </div>
+      <div class="auto-progress-bar-bg">
+        <div class="auto-progress-bar-fill" id="autoProgressBar" style="width: 0%;"></div>
+      </div>
+      
+      <div class="auto-current-creator" id="autoCurrentCard">
+        <div class="avatar" id="autoAvatar">C</div>
+        <div class="auto-creator-info">
+          <strong id="autoCreatorName">Creator Name</strong>
+          <span id="autoCreatorMeta">+91 • Shade: —</span>
+        </div>
+        <div class="auto-countdown-badge" id="autoCountdownBadge" hidden>
+          <span id="autoCountdownSec">10s</span>
+        </div>
+      </div>
+
+      <div class="auto-status-hint" id="autoStatusHint">
+        Click <strong>Start Auto-Send Loop</strong> below. WhatsApp opens in a single dedicated tab with each creator's message pre-filled. Just press <strong>Enter</strong> on WhatsApp while the loop automatically advances to the next creator!
+      </div>
+    </div>
+
+    <div class="auto-log-wrap">
+      <div class="auto-log-title">Live Activity Log</div>
+      <div class="auto-log-list" id="autoLogList">
+        <div class="auto-log-entry">Queue loaded. Click Start to begin loop.</div>
+      </div>
+    </div>
+
+    <div class="dialog-actions auto-actions">
+      <button type="button" class="button ghost danger" id="autoStopBtn" style="color:#a83232;" disabled>Stop</button>
+      <button type="button" class="button secondary" id="autoPauseBtn" disabled>Pause</button>
+      <button type="button" class="button ghost" id="autoSkipBtn" disabled>Skip current</button>
+      <button type="button" class="button primary" id="autoRunBtn">▶ Start Auto-Send Loop</button>
+    </div>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>

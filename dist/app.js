@@ -823,6 +823,231 @@ $("waSaveAsNewTemplateBtn").addEventListener("click",()=>{
   }
 });
 
+// --- WHATSAPP AUTO-PILOT / AUTO-SEND QUEUE ---
+let autoQueue = [];
+let autoTotal = 0;
+let autoIndex = 0;
+let autoRunning = false;
+let autoPaused = false;
+let autoTimerId = null;
+let autoCountdownRemaining = 0;
+
+function addAutoLog(text, type = ""){
+  const list = $("autoLogList");
+  if(!list) return;
+  const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const entry = document.createElement("div");
+  entry.className = `auto-log-entry ${type}`;
+  entry.textContent = `[${time}] ${text}`;
+  list.appendChild(entry);
+  list.scrollTop = list.scrollHeight;
+}
+
+function updateAutoCurrentDisplay(contact){
+  if(!contact){
+    $("autoCreatorName").textContent = "Queue Completed";
+    $("autoCreatorMeta").textContent = "All creators in queue processed";
+    $("autoAvatar").textContent = "✓";
+    $("autoStatusHint").textContent = "All pending creators have been sent messages!";
+    return;
+  }
+  const lead = waLead(contact);
+  const fname = firstName(lead);
+  $("autoCreatorName").textContent = contact.name;
+  $("autoCreatorMeta").textContent = `${contact.whatsapp_display}${contact.preferred_shade ? ` • Shade: ${contact.preferred_shade}` : ""}`;
+  $("autoAvatar").textContent = fname[0]?.toUpperCase() || "C";
+  $("autoStatusHint").innerHTML = `WhatsApp tab opened for <strong>${escapeHtml(contact.name)}</strong>. Just press <strong>Enter</strong> on WhatsApp while the loop automatically advances!`;
+}
+
+function openWaAutoDialog(){
+  ensureWaTemplates();
+  const optionsHtml = waState.templates.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join("");
+  $("waAutoTemplateSelect").innerHTML = optionsHtml;
+  $("waAutoTemplateSelect").value = waState.activeTemplateId;
+
+  autoQueue = waState.contacts.filter(c => waStatusOf(c.whatsapp_e164) === "pending");
+  autoTotal = autoQueue.length;
+  autoIndex = 0;
+  autoRunning = false;
+  autoPaused = false;
+  clearInterval(autoTimerId);
+
+  $("autoProgressLabel").textContent = "Ready to start";
+  $("autoProgressCount").textContent = `0 / ${autoTotal} sent`;
+  $("autoProgressBar").style.width = "0%";
+  $("autoCountdownBadge").hidden = true;
+
+  $("autoRunBtn").style.display = "inline-block";
+  $("autoRunBtn").textContent = "▶ Start Auto-Send Loop";
+  $("autoRunBtn").disabled = autoTotal === 0;
+  $("autoPauseBtn").style.display = "none";
+  $("autoPauseBtn").disabled = true;
+  $("autoStopBtn").disabled = true;
+  $("autoSkipBtn").disabled = true;
+
+  const logList = $("autoLogList");
+  logList.innerHTML = `<div class="auto-log-entry">Found ${autoTotal} pending creators ready for outreach.</div>`;
+
+  if(autoQueue.length > 0){
+    updateAutoCurrentDisplay(autoQueue[0]);
+  } else {
+    updateAutoCurrentDisplay(null);
+  }
+
+  $("waAutoDialog").showModal();
+}
+
+function stopAutoLoop(){
+  autoRunning = false;
+  autoPaused = false;
+  clearInterval(autoTimerId);
+  $("autoCountdownBadge").hidden = true;
+  $("autoRunBtn").style.display = "inline-block";
+  $("autoRunBtn").textContent = "▶ Start Auto-Send Loop";
+  $("autoRunBtn").disabled = autoQueue.length === 0;
+  $("autoPauseBtn").style.display = "none";
+  $("autoStopBtn").disabled = true;
+  $("autoSkipBtn").disabled = true;
+  $("autoProgressLabel").textContent = "Stopped";
+  addAutoLog("⏹ Auto-Send loop stopped");
+  showToast("Auto-Send loop stopped");
+}
+
+function pauseAutoLoop(){
+  if(!autoRunning) return;
+  if(autoPaused){
+    autoPaused = false;
+    $("autoPauseBtn").textContent = "Pause";
+    $("autoProgressLabel").textContent = "Sending in progress...";
+    addAutoLog("▶ Resumed Auto-Send loop");
+    startNextCountdown();
+  } else {
+    autoPaused = true;
+    clearInterval(autoTimerId);
+    $("autoPauseBtn").textContent = "▶ Resume";
+    $("autoProgressLabel").textContent = "Paused";
+    addAutoLog("⏸ Paused Auto-Send loop");
+  }
+}
+
+function skipAutoCurrent(){
+  if(!autoRunning) return;
+  clearInterval(autoTimerId);
+  addAutoLog("⏭ Skipped timer, advancing to next creator immediately...");
+  processNextAutoContact();
+}
+
+function startNextCountdown(){
+  clearInterval(autoTimerId);
+  if(autoQueue.length === 0){
+    finishAutoLoop();
+    return;
+  }
+  const delaySec = parseInt($("waAutoDelay").value, 10) || 10;
+  autoCountdownRemaining = delaySec;
+  $("autoCountdownBadge").hidden = false;
+  $("autoCountdownSec").textContent = `Next in ${autoCountdownRemaining}s`;
+
+  autoTimerId = setInterval(() => {
+    if(autoPaused) return;
+    autoCountdownRemaining--;
+    if(autoCountdownRemaining > 0){
+      $("autoCountdownSec").textContent = `Next in ${autoCountdownRemaining}s`;
+    } else {
+      clearInterval(autoTimerId);
+      $("autoCountdownBadge").hidden = true;
+      processNextAutoContact();
+    }
+  }, 1000);
+}
+
+function processNextAutoContact(){
+  if(!autoRunning || autoPaused) return;
+  if(autoQueue.length === 0){
+    finishAutoLoop();
+    return;
+  }
+
+  const contact = autoQueue.shift();
+  autoIndex++;
+
+  const selectedTemplateId = $("waAutoTemplateSelect").value;
+  const tmpl = waState.templates.find(t=>t.id === selectedTemplateId) || activeWaTemplate();
+  const message = renderWaMessage(tmpl.body, contact);
+
+  updateAutoCurrentDisplay(contact);
+
+  const url = `https://wa.me/${contact.whatsapp_e164}?text=${encodeURIComponent(message)}`;
+  window.open(url, "wa_outreach_runner_tab");
+
+  setWaStatus(contact, "sent");
+
+  const pct = Math.round((autoIndex / autoTotal) * 100);
+  $("autoProgressBar").style.width = `${pct}%`;
+  $("autoProgressCount").textContent = `${autoIndex} / ${autoTotal} sent (${pct}%)`;
+  $("autoProgressLabel").textContent = `Sending (${pct}%)`;
+
+  addAutoLog(`✓ [${autoIndex}/${autoTotal}] Opened chat for ${contact.name} (${contact.whatsapp_display})`, "success");
+
+  if(autoQueue.length > 0){
+    startNextCountdown();
+  } else {
+    finishAutoLoop();
+  }
+}
+
+function finishAutoLoop(){
+  autoRunning = false;
+  autoPaused = false;
+  clearInterval(autoTimerId);
+  $("autoCountdownBadge").hidden = true;
+  $("autoProgressBar").style.width = "100%";
+  $("autoProgressLabel").textContent = "Completed!";
+  $("autoProgressCount").textContent = `${autoIndex} / ${autoTotal} sent (100%)`;
+  $("autoRunBtn").style.display = "inline-block";
+  $("autoRunBtn").textContent = "Completed";
+  $("autoRunBtn").disabled = true;
+  $("autoPauseBtn").style.display = "none";
+  $("autoStopBtn").disabled = true;
+  $("autoSkipBtn").disabled = true;
+  updateAutoCurrentDisplay(null);
+  addAutoLog(`🎉 All ${autoTotal} creators completed!`, "success");
+  showToast("Auto-Send loop completed successfully!");
+}
+
+function startAutoLoop(){
+  if(autoQueue.length === 0){
+    showToast("No pending creators in queue!");
+    return;
+  }
+  autoRunning = true;
+  autoPaused = false;
+  $("autoRunBtn").style.display = "none";
+  $("autoPauseBtn").style.display = "inline-block";
+  $("autoPauseBtn").disabled = false;
+  $("autoPauseBtn").textContent = "Pause";
+  $("autoStopBtn").disabled = false;
+  $("autoSkipBtn").disabled = false;
+  $("autoProgressLabel").textContent = "Starting...";
+  addAutoLog("🚀 Starting Auto-Send loop...");
+  processNextAutoContact();
+}
+
+$("startWaAutoBtn").addEventListener("click", openWaAutoDialog);
+$("closeWaAutoBtn").addEventListener("click", () => {
+  if(autoRunning && !confirm("Auto-Send is currently running. Stop and close?")) return;
+  stopAutoLoop();
+  $("waAutoDialog").close();
+});
+$("autoRunBtn").addEventListener("click", startAutoLoop);
+$("autoPauseBtn").addEventListener("click", pauseAutoLoop);
+$("autoStopBtn").addEventListener("click", stopAutoLoop);
+$("autoSkipBtn").addEventListener("click", skipAutoCurrent);
+$("waQueueStartAutoBtn").addEventListener("click", () => {
+  $("waQueueDialog").close();
+  openWaAutoDialog();
+});
+
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});

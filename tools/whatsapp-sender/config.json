@@ -1,0 +1,29 @@
+{
+  "activeTemplate": "prediction-talk-monetization",
+  "minDelaySeconds": 12,
+  "maxDelaySeconds": 20,
+  "batchLimit": 0,
+  "dryRun": false,
+  "brand": "Prediction Talk",
+  "website": "https://predictiontalk.com",
+  "contactsFile": "../../outputs/creator-whatsapp-outreach/creator_contacts.json",
+  "chromePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "templates": {
+    "prediction-talk-monetization": {
+      "name": "Prediction Talk Creator Monetization",
+      "body": "Hi {first_name},\n\nWe have been following your work and really appreciate the aesthetic and authenticity you bring to your content.\n\nWe are reaching out from the Creator Partnerships team at *Prediction Talk*. We are currently onboarding a few select fashion and lifestyle creators for a *high-earning monetization opportunity*—allowing you to generate *recurring income* from your content alongside *brand-funded paid promotion* for your profile.\n\nWould you be open to us sharing the brief proposal here?\n\nWebsite: https://predictiontalk.com"
+    },
+    "brown-anatomy-commission": {
+      "name": "Brown Anatomy 2% Commission",
+      "body": "Hi {first_name},\n\nWe’re currently onboarding 15 creators for a performance-based collaboration with Brown Anatomy and Prediction Talk (predictiontalk.com).\n\nYou will receive a 2% commission on the total value of all orders generated through your promotion. The more orders you generate, the more you earn—there is no fixed earning limit.\n\nThis is a great opportunity to build a long-term association with both brands while earning through your performance.\n\nIf you’re interested, please reply here. I’ll forward your profile to our team, and they will connect with you to explain the collaboration, payment structure, and next steps.\n\nWarm regards,\nTeam Brown Anatomy & Prediction Talk"
+    },
+    "shade-reconnect": {
+      "name": "House of Sandhya (Shade Reconnect)",
+      "body": "Hi {first_name},\n\nHope you are doing well!\n\nWe loved collaborating with you on shade *{preferred_shade}*. We're currently launching an exclusive new collection at House of Sandhya and would love to partner with you again!\n\nWould you be open to exploring this collaboration? We'd love to share the catalog and proposal with you.\n\nWarm regards,\nTeam House of Sandhya\nhttps://houseofsandhya.com"
+    },
+    "barter-pr-gifting": {
+      "name": "Barter / PR Gifting Invite",
+      "body": "Hi {first_name},\n\nWe love your content style and would love to send you some of our bestselling pieces as an exclusive PR gift collaboration with {brand}!\n\nNo strict deliverables—just genuine styling and a reel/story tag if you love the outfit.\n\nLet us know if you'd be open to this and we'll share the collection lookbook with you!\n\nWarm regards,\nTeam {brand}"
+    }
+  }
+}
