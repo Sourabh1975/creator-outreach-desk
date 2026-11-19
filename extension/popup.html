@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Creator Desk Auto-Sender</title>
+  <title>Creator Desk Assistant</title>
   <style>
     body {
-      width: 260px;
+      width: 280px;
       margin: 0;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -41,12 +41,12 @@
     .toggle-card {
       background: #fff;
       border: 1px solid #e7dfdc;
-      border-radius: 12px;
-      padding: 12px;
+      border-radius: 10px;
+      padding: 10px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .toggle-card span {
       font-size: 12px;
@@ -80,10 +80,70 @@
     }
     input:checked + .slider { background-color: #70264f; }
     input:checked + .slider:before { transform: translateX(16px); }
-    .note {
+
+    .scraper-card {
+      background: #ffffff;
+      border: 1px solid #e7dfdc;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+    .scraper-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #70264f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .badge-count {
+      background: #70264f;
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 800;
+    }
+    .scraper-desc {
       font-size: 11px;
       color: #766c72;
-      line-height: 1.45;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .btn-action {
+      width: 100%;
+      background: #70264f;
+      color: #fff;
+      border: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      transition: background 0.2s;
+    }
+    .btn-action:hover { background: #561d3c; }
+    .btn-link {
+      width: 100%;
+      background: #f4ecef;
+      color: #70264f;
+      border: 1px solid #e0d0d8;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+      box-sizing: border-box;
     }
     .status-badge {
       display: inline-block;
@@ -93,7 +153,7 @@
       background: #e2f4ed;
       padding: 3px 7px;
       border-radius: 6px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -102,12 +162,12 @@
     <div class="logo">C</div>
     <div>
       <h1>Creator Desk</h1>
-      <small>WhatsApp & Gmail Auto-Sender</small>
+      <small>Outreach & Instagram Scraper</small>
     </div>
   </div>
 
   <div class="toggle-card">
-    <span>WhatsApp Auto-Send</span>
+    <span>💬 WhatsApp Auto-Send</span>
     <label class="switch">
       <input type="checkbox" id="autoSendToggle" checked>
       <span class="slider"></span>
@@ -115,17 +175,26 @@
   </div>
 
   <div class="toggle-card">
-    <span>Gmail Auto-Send</span>
+    <span>✉️ Gmail Auto-Send</span>
     <label class="switch">
       <input type="checkbox" id="autoSendEmailToggle" checked>
       <span class="slider"></span>
     </label>
   </div>
 
-  <div class="note">
-    Auto-clicks Send in WhatsApp Web & Gmail within 2s, then closes the tab automatically.
-    <div><span class="status-badge" id="statusBadge">Active & Ready</span></div>
+  <div class="scraper-card">
+    <div class="scraper-title">
+      <span>📸 Instagram UGC Scraper</span>
+      <span class="badge-count" id="igCountBadge">0</span>
+    </div>
+    <div class="scraper-desc">
+      Collects &lt;3k followers creators with emails/WhatsApp from Instagram profiles.
+    </div>
+    <button class="btn-action" id="exportIgCsvBtn">📥 Download Excel / CSV</button>
+    <a href="https://www.instagram.com/explore/tags/ugccreatorindia/" target="_blank" class="btn-link">🔗 Open #ugccreatorindia</a>
   </div>
+
+  <div><span class="status-badge" id="statusBadge">Active & Ready</span></div>
 
   <script src="popup.js"></script>
 </body>
