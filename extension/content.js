@@ -66,8 +66,11 @@
     // 1. Try finding send button
     const sendBtn =
       document.querySelector('span[data-icon="send"]')?.closest("button") ||
+      document.querySelector('span[data-icon="send-light"]')?.closest("button") ||
+      document.querySelector('span[data-icon*="send"]')?.closest("button") ||
       document.querySelector('button[aria-label="Send"]') ||
-      document.querySelector('button[data-tab="11"]');
+      document.querySelector('button[data-tab="11"]') ||
+      document.querySelector('footer button:not([aria-label*="voice"]):not([aria-label*="attach"]):not([aria-label*="sticker"])');
 
     if (sendBtn) {
       sendBtn.click();
@@ -77,19 +80,15 @@
     // 2. Try input box + Enter
     const inputDiv =
       document.querySelector('footer div[contenteditable="true"]') ||
-      document.querySelector('div[contenteditable="true"][data-tab="10"]');
+      document.querySelector('div[contenteditable="true"][data-tab="10"]') ||
+      document.querySelector('div[contenteditable="true"]');
 
-    if (inputDiv && (inputDiv.innerText || "").trim().length > 0) {
+    if (inputDiv) {
       inputDiv.focus();
-      const enterDown = new KeyboardEvent("keydown", {
-        bubbles: true,
-        cancelable: true,
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        which: 13
-      });
-      inputDiv.dispatchEvent(enterDown);
+      const opts = { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13 };
+      inputDiv.dispatchEvent(new KeyboardEvent("keydown", opts));
+      inputDiv.dispatchEvent(new KeyboardEvent("keypress", opts));
+      inputDiv.dispatchEvent(new KeyboardEvent("keyup", opts));
       return true;
     }
 

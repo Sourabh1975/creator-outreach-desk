@@ -495,7 +495,7 @@ function openWaQueue(contact){
 function currentWaContact(){ return waState.contacts[waQueueIndex]; }
 function nextPendingWa(){ const pending=pendingWaContacts();return pending.find(contact=>waState.contacts.indexOf(contact)>waQueueIndex)||pending[0]; }
 function setWaStatus(contact,status){waState.statuses[contact.whatsapp_e164]={status,updatedAt:new Date().toISOString()};saveWa();renderWhatsApp();}
-function openWhatsApp(contact){const message=$("waQueueDialog").open&&currentWaContact()===contact?$("waQueueMessage").value:waMessageFor(contact);window.open(`https://wa.me/${contact.whatsapp_e164}?text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");}
+function openWhatsApp(contact){const message=$("waQueueDialog").open&&currentWaContact()===contact?$("waQueueMessage").value:waMessageFor(contact);window.open(`https://web.whatsapp.com/send?phone=${contact.whatsapp_e164}&text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");}
 
 function normaliseIndianPhone(value){
   let digits=String(value??"").replace(/\D/g,"");
@@ -977,7 +977,7 @@ function processNextAutoContact(){
 
   updateAutoCurrentDisplay(contact);
 
-  const url = `https://wa.me/${contact.whatsapp_e164}?text=${encodeURIComponent(message)}`;
+  const url = `https://web.whatsapp.com/send?phone=${contact.whatsapp_e164}&text=${encodeURIComponent(message)}`;
   window.open(url, "wa_outreach_runner_tab");
 
   setWaStatus(contact, "sent");
