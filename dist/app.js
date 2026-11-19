@@ -245,11 +245,155 @@ function render(){
   $("emptyState").hidden=filtered.length>0;
   updateMetrics();
 }
+const DEFAULT_WA_TEMPLATES = [
+  {
+    id: "prediction-talk-monetization",
+    name: "Prediction Talk Monetization",
+    body: `Hi {first_name},
+
+We have been following your work and really appreciate the aesthetic and authenticity you bring to your content.
+
+We are reaching out from the Creator Partnerships team at *Prediction Talk*. We are currently onboarding a few select fashion and lifestyle creators for a *high-earning monetization opportunity*—allowing you to generate *recurring income* from your content alongside *brand-funded paid promotion* for your profile.
+
+Would you be open to us sharing the brief proposal here?
+
+Website: https://predictiontalk.com`
+  },
+  {
+    id: "brown-anatomy-commission",
+    name: "Brown Anatomy 2% Commission",
+    body: `Hi {first_name},
+
+We’re currently onboarding 15 creators for a performance-based collaboration with Brown Anatomy and Prediction Talk (predictiontalk.com).
+
+You will receive a 2% commission on the total value of all orders generated through your promotion. The more orders you generate, the more you earn—there is no fixed earning limit.
+
+This is a great opportunity to build a long-term association with both brands while earning through your performance.
+
+If you’re interested, please reply here. I’ll forward your profile to our team, and they will connect with you to explain the collaboration, payment structure, and next steps.
+
+Warm regards,
+Team Brown Anatomy & Prediction Talk`
+  },
+  {
+    id: "shade-reconnect",
+    name: "House of Sandhya (Shade Reconnect)",
+    body: `Hi {first_name},
+
+Hope you are doing well!
+
+We loved collaborating with you on shade *{preferred_shade}*. We're currently launching an exclusive new collection at House of Sandhya and would love to partner with you again!
+
+Would you be open to exploring this collaboration? We'd love to share the catalog and proposal with you.
+
+Warm regards,
+Team House of Sandhya
+https://houseofsandhya.com`
+  },
+  {
+    id: "barter-pr-gifting",
+    name: "Barter / PR Gifting Invite",
+    body: `Hi {first_name},
+
+We love your content style and would love to send you some of our bestselling pieces as an exclusive PR gift collaboration with {brand}!
+
+No strict deliverables—just genuine styling and a reel/story tag if you love the outfit.
+
+Let us know if you'd be open to this and we'll share the collection lookbook with you!
+
+Warm regards,
+Team {brand}`
+  }
+];
+
+function ensureWaTemplates(){
+  if(!Array.isArray(waState.templates) || waState.templates.length === 0){
+    waState.templates = DEFAULT_WA_TEMPLATES.map(t=>({...t}));
+  }
+  if(!waState.activeTemplateId || !waState.templates.some(t => t.id === waState.activeTemplateId)){
+    waState.activeTemplateId = waState.templates[0].id;
+  }
+  waState.creatorTemplates ||= {};
+  waState.customMessages ||= {};
+  saveWa();
+}
+
+function activeWaTemplate(){
+  ensureWaTemplates();
+  return waState.templates.find(t=>t.id===waState.activeTemplateId) || waState.templates[0];
+}
+
+function templateForContact(contact){
+  ensureWaTemplates();
+  if(contact && waState.creatorTemplates && waState.creatorTemplates[contact.whatsapp_e164]){
+    const assigned = waState.templates.find(t=>t.id===waState.creatorTemplates[contact.whatsapp_e164]);
+    if(assigned) return assigned;
+  }
+  return activeWaTemplate();
+}
+
+function templateNameFor(contact){
+  ensureWaTemplates();
+  if(contact && waState.customMessages && waState.customMessages[contact.whatsapp_e164]){
+    return "Custom (Edited)";
+  }
+  return templateForContact(contact).name;
+}
+
+function renderWaMessage(templateBody, contact){
+  const lead = waLead(contact);
+  const fname = firstName(lead);
+  const fullName = contact.name || lead.name || "";
+  const shade = contact.preferred_shade || "your favorite shade";
+  const brand = state.campaign?.brand || "Prediction Talk";
+  const website = state.campaign?.brandLink || "https://predictiontalk.com";
+  const phone = contact.whatsapp_display || contact.whatsapp_e164 || "";
+
+  return (templateBody || "")
+    .replaceAll("{first_name}", fname)
+    .replaceAll("{creator_name}", fullName)
+    .replaceAll("{name}", fullName)
+    .replaceAll("{preferred_shade}", shade)
+    .replaceAll("{shade}", shade)
+    .replaceAll("{brand}", brand)
+    .replaceAll("{whatsapp}", phone)
+    .replaceAll("{website}", website)
+    .replaceAll("{instagram}", lead.profile_url || "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function waLead(contact){
   const handle=(contact.instagram_url||"").match(/instagram\.com\/([^/?#]+)/i)?.[1]||contact.name.replace(/\s+/g,"_").toLowerCase();
   return {name:contact.name,handle,profile_url:contact.instagram_url||""};
 }
-function waMessageFor(contact){ return messageFor(waLead(contact)); }
+
+function waMessageFor(contact){
+  if(contact && waState.customMessages && waState.customMessages[contact.whatsapp_e164]){
+    return waState.customMessages[contact.whatsapp_e164];
+  }
+  const tmpl = templateForContact(contact);
+  return renderWaMessage(tmpl.body, contact);
+}
+
+function renderWaTemplateOptions(){
+  ensureWaTemplates();
+  const optionsHtml = waState.templates.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join("");
+  if($("waHomeTemplate")) {
+    $("waHomeTemplate").innerHTML = optionsHtml;
+    $("waHomeTemplate").value = waState.activeTemplateId;
+  }
+  if($("waQueueTemplateSelect")) {
+    $("waQueueTemplateSelect").innerHTML = optionsHtml;
+    const current = currentWaContact();
+    if(current){
+      $("waQueueTemplateSelect").value = templateForContact(current).id;
+    } else {
+      $("waQueueTemplateSelect").value = waState.activeTemplateId;
+    }
+  }
+}
+
 function updateWaMetrics(){
   const statuses=waState.contacts.map(contact=>waStatusOf(contact.whatsapp_e164));
   const sent=statuses.filter(status=>status==="sent"||status==="replied").length;
@@ -260,12 +404,24 @@ function updateWaMetrics(){
   $("waSentPercent").textContent=`${waState.contacts.length?Math.round(sent/waState.contacts.length*100):0}% complete`;
 }
 function renderWhatsApp(){
+  ensureWaTemplates();
   const query=$("waSearchInput").value.toLowerCase().trim();const filter=$("waStatusFilter").value;
   const filtered=waState.contacts.filter(contact=>{
     const hay=[contact.name,contact.whatsapp_display,contact.whatsapp_e164,contact.preferred_shade].join(" ").toLowerCase();
     return (!query||hay.includes(query))&&(filter==="all"||waStatusOf(contact.whatsapp_e164)===filter);
   });
-  $("waCreatorRows").innerHTML=filtered.map(contact=>{const status=waStatusOf(contact.whatsapp_e164);return `<tr><td><div class="creator"><div class="avatar">${escapeHtml(firstName(waLead(contact))[0]?.toUpperCase()||"C")}</div><div><strong>${escapeHtml(contact.name)}</strong><small>${contact.instagram_url?`Instagram profile available`:"Old collaborator"}</small></div></div></td><td class="contact">${escapeHtml(contact.whatsapp_display)}</td><td>${escapeHtml(contact.preferred_shade||"—")}</td><td><span class="status ${status}">${status[0].toUpperCase()+status.slice(1)}</span></td><td><div class="row-actions">${contact.instagram_url?`<button class="mini" data-wa-instagram="${escapeHtml(contact.whatsapp_e164)}">Instagram</button>`:""}<button class="mini primary" data-wa-open="${escapeHtml(contact.whatsapp_e164)}">Open WhatsApp</button></div></td></tr>`;}).join("");
+  $("waCreatorRows").innerHTML=filtered.map(contact=>{
+    const status=waStatusOf(contact.whatsapp_e164);
+    const tmplName=templateNameFor(contact);
+    return `<tr>
+      <td><div class="creator"><div class="avatar">${escapeHtml(firstName(waLead(contact))[0]?.toUpperCase()||"C")}</div><div><strong>${escapeHtml(contact.name)}</strong><small>${contact.instagram_url?`Instagram profile available`:"Old collaborator"}</small></div></div></td>
+      <td class="contact">${escapeHtml(contact.whatsapp_display)}</td>
+      <td>${escapeHtml(contact.preferred_shade||"—")}</td>
+      <td><span class="template-badge" data-wa-badge="${escapeHtml(contact.whatsapp_e164)}" title="${escapeHtml(tmplName)}">${escapeHtml(tmplName)}</span></td>
+      <td><span class="status ${status}">${status[0].toUpperCase()+status.slice(1)}</span></td>
+      <td><div class="row-actions">${contact.instagram_url?`<button class="mini" data-wa-instagram="${escapeHtml(contact.whatsapp_e164)}">Instagram</button>`:""}<button class="mini primary" data-wa-open="${escapeHtml(contact.whatsapp_e164)}">Open WhatsApp</button></div></td>
+    </tr>`;
+  }).join("");
   $("waEmptyState").hidden=filtered.length>0;
   if(!waState.contacts.length){$("waEmptyState").hidden=false;$("waEmptyState").textContent="Import the creator contacts JSON file to begin.";}else if(!filtered.length){$("waEmptyState").hidden=false;$("waEmptyState").textContent="No WhatsApp contacts match this filter.";}
   updateWaMetrics();
@@ -316,9 +472,25 @@ function waContactByPhone(phone){ return waState.contacts.find(contact=>contact.
 function pendingWaContacts(){ return waState.contacts.filter(contact=>waStatusOf(contact.whatsapp_e164)==="pending"); }
 function openWaQueue(contact){
   if(!contact){if($("waQueueDialog").open)$("waQueueDialog").close();showToast(waState.contacts.length?"No pending WhatsApp contacts left":"Import contacts first");return;}
-  waQueueIndex=waState.contacts.indexOf(contact);$("waQueueCreatorName").textContent=contact.name;$("waQueueNumber").textContent=contact.whatsapp_display;
+  waQueueIndex=waState.contacts.indexOf(contact);
+  const lead=waLead(contact);
+  const fname=firstName(lead);
+  $("waQueueCreatorName").textContent=contact.name;
+  $("waQueueNumber").textContent=contact.whatsapp_display;
   $("waQueueMeta").textContent=contact.preferred_shade?`Previous shade: ${contact.preferred_shade}`:"Old collaborator";
-  $("waQueueAvatar").textContent=firstName(waLead(contact))[0]?.toUpperCase()||"C";$("waQueueMessage").value=waMessageFor(contact);$("waQueueDialog").showModal();
+  $("waQueueAvatar").textContent=fname[0]?.toUpperCase()||"C";
+  $("waScopeSingleLabel").textContent=`Only ${fname||"this creator"}`;
+
+  if(waState.creatorTemplates&&waState.creatorTemplates[contact.whatsapp_e164]){
+    $("waScopeSingle").checked=true;
+  } else {
+    $("waScopeAll").checked=true;
+  }
+
+  renderWaTemplateOptions();
+  $("waQueueTemplateSelect").value=templateForContact(contact).id;
+  $("waQueueMessage").value=waMessageFor(contact);
+  $("waQueueDialog").showModal();
 }
 function currentWaContact(){ return waState.contacts[waQueueIndex]; }
 function nextPendingWa(){ const pending=pendingWaContacts();return pending.find(contact=>waState.contacts.indexOf(contact)>waQueueIndex)||pending[0]; }
@@ -405,6 +577,252 @@ $("openWhatsAppBtn").addEventListener("click",()=>openWhatsApp(currentWaContact(
 $("waSkipBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"skipped");openWaQueue(nextPendingWa());});
 $("waMarkSentBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"sent");openWaQueue(nextPendingWa());});
 $("waMarkRepliedBtn").addEventListener("click",()=>{const contact=currentWaContact();setWaStatus(contact,"replied");openWaQueue(nextPendingWa());});
+
+$("waHomeTemplate").addEventListener("change",()=>{
+  const newId=$("waHomeTemplate").value;
+  const tmpl=waState.templates.find(t=>t.id===newId);
+  if(!tmpl) return;
+  waState.activeTemplateId=newId;
+  waState.creatorTemplates={};
+  waState.customMessages={};
+  saveWa();
+  renderWaTemplateOptions();
+  renderWhatsApp();
+  showToast(`"${tmpl.name}" set for all creators`);
+});
+
+$("waQueueTemplateSelect").addEventListener("change",()=>{
+  const contact=currentWaContact();
+  if(!contact) return;
+  const newTemplateId=$("waQueueTemplateSelect").value;
+  const tmpl=waState.templates.find(t=>t.id===newTemplateId);
+  if(!tmpl) return;
+
+  const isAll=$("waScopeAll").checked;
+  if(isAll){
+    waState.activeTemplateId=newTemplateId;
+    waState.creatorTemplates={};
+    waState.customMessages={};
+    saveWa();
+    $("waQueueMessage").value=renderWaMessage(tmpl.body,contact);
+    renderWaTemplateOptions();
+    renderWhatsApp();
+    showToast(`"${tmpl.name}" set for all creators`);
+  } else {
+    waState.creatorTemplates||={};
+    waState.creatorTemplates[contact.whatsapp_e164]=newTemplateId;
+    if(waState.customMessages) delete waState.customMessages[contact.whatsapp_e164];
+    saveWa();
+    $("waQueueMessage").value=renderWaMessage(tmpl.body,contact);
+    renderWhatsApp();
+    showToast(`"${tmpl.name}" selected for ${contact.name}`);
+  }
+});
+
+$("waApplyAllBtn").addEventListener("click",()=>{
+  const contact=currentWaContact();
+  if(!contact) return;
+  const currentText=$("waQueueMessage").value.trim();
+  if(!currentText){
+    showToast("Message cannot be empty");
+    return;
+  }
+  const selectedTemplateId=$("waQueueTemplateSelect").value;
+  let tmpl=waState.templates.find(t=>t.id===selectedTemplateId)||waState.templates[0];
+
+  const fname=firstName(waLead(contact));
+  const creatorFullName=contact.name||"";
+  const shade=contact.preferred_shade||"";
+  let generalizedBody=currentText;
+  if(fname&&fname!=="there"){
+    generalizedBody=generalizedBody.replace(new RegExp(`\\b${fname}\\b`,"i"),"{first_name}");
+  }
+  if(creatorFullName&&creatorFullName!==fname){
+    generalizedBody=generalizedBody.replace(new RegExp(`\\b${creatorFullName}\\b`,"i"),"{name}");
+  }
+  if(shade){
+    generalizedBody=generalizedBody.replace(new RegExp(`\\b${shade.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`,"i"),"{preferred_shade}");
+  }
+
+  tmpl.body=generalizedBody;
+  waState.activeTemplateId=tmpl.id;
+  waState.creatorTemplates={};
+  waState.customMessages={};
+  saveWa();
+  renderWaTemplateOptions();
+  renderWhatsApp();
+  $("waScopeAll").checked=true;
+  showToast(`"${tmpl.name}" applied to all creators!`);
+});
+
+$("waQueueMessage").addEventListener("input",()=>{
+  const contact=currentWaContact();
+  if(!contact) return;
+  if($("waScopeSingle").checked){
+    waState.customMessages||={};
+    waState.customMessages[contact.whatsapp_e164]=$("waQueueMessage").value;
+    saveWa();
+    renderWhatsApp();
+  }
+});
+
+let waTemplateEditorMode="add";
+let waEditingTemplateId=null;
+
+function openWaTemplateEditor(mode,templateId=null){
+  waTemplateEditorMode=mode;
+  ensureWaTemplates();
+  if(mode==="edit"){
+    waEditingTemplateId=templateId||($("waQueueDialog").open?$("waQueueTemplateSelect").value:$("waHomeTemplate").value);
+    const tmpl=waState.templates.find(t=>t.id===waEditingTemplateId)||waState.templates[0];
+    $("waTemplateDialogTitle").textContent=`Edit "${tmpl.name}"`;
+    $("waTemplateName").value=tmpl.name;
+    $("waTemplateBody").value=tmpl.body;
+    $("waDeleteTemplateBtn").style.display=waState.templates.length>1?"block":"none";
+  } else {
+    waEditingTemplateId=null;
+    $("waTemplateDialogTitle").textContent="Add WhatsApp template";
+    $("waTemplateName").value="";
+    $("waTemplateBody").value=`Hi {first_name},
+
+We love your work and would love to collaborate with you!
+
+Would you be open to hearing more?
+
+Warm regards,
+Team {brand}`;
+    $("waDeleteTemplateBtn").style.display="none";
+  }
+  $("waTemplateDialog").showModal();
+}
+
+$("waAddTemplateBtn").addEventListener("click",()=>openWaTemplateEditor("add"));
+$("waQueueAddTemplateBtn").addEventListener("click",()=>openWaTemplateEditor("add"));
+$("waEditTemplateBtn").addEventListener("click",()=>openWaTemplateEditor("edit"));
+$("waQueueEditTemplateBtn").addEventListener("click",()=>openWaTemplateEditor("edit"));
+$("closeWaTemplateBtn").addEventListener("click",()=>$("waTemplateDialog").close());
+$("cancelWaTemplateBtn").addEventListener("click",()=>$("waTemplateDialog").close());
+
+$("saveWaTemplateBtn").addEventListener("click",(e)=>{
+  e.preventDefault();
+  const name=$("waTemplateName").value.trim();
+  const body=$("waTemplateBody").value.trim();
+  if(!name){showToast("Please enter a template name");return;}
+  if(!body){showToast("Please enter template text");return;}
+
+  ensureWaTemplates();
+  if(waTemplateEditorMode==="add"){
+    const id=`wa-tmpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`;
+    const newTmpl={id,name,body};
+    waState.templates.push(newTmpl);
+
+    if($("waQueueDialog").open&&$("waScopeSingle").checked&&currentWaContact()){
+      waState.creatorTemplates||={};
+      waState.creatorTemplates[currentWaContact().whatsapp_e164]=id;
+      if(waState.customMessages) delete waState.customMessages[currentWaContact().whatsapp_e164];
+      saveWa();
+      renderWaTemplateOptions();
+      renderWhatsApp();
+      $("waQueueTemplateSelect").value=id;
+      $("waQueueMessage").value=waMessageFor(currentWaContact());
+      showToast(`Template "${name}" added for ${currentWaContact().name}`);
+    } else {
+      waState.activeTemplateId=id;
+      waState.creatorTemplates={};
+      waState.customMessages={};
+      saveWa();
+      renderWaTemplateOptions();
+      renderWhatsApp();
+      if($("waQueueDialog").open&&currentWaContact()){
+        $("waQueueTemplateSelect").value=id;
+        $("waQueueMessage").value=waMessageFor(currentWaContact());
+      }
+      showToast(`Template "${name}" added & set for all creators!`);
+    }
+  } else {
+    const tmpl=waState.templates.find(t=>t.id===waEditingTemplateId);
+    if(tmpl){
+      tmpl.name=name;
+      tmpl.body=body;
+      saveWa();
+      renderWaTemplateOptions();
+      renderWhatsApp();
+      if($("waQueueDialog").open&&currentWaContact()){
+        $("waQueueMessage").value=waMessageFor(currentWaContact());
+      }
+      showToast(`Template "${name}" updated!`);
+    }
+  }
+  $("waTemplateDialog").close();
+});
+
+$("waDeleteTemplateBtn").addEventListener("click",()=>{
+  if(waState.templates.length<=1){
+    showToast("At least one template is required");
+    return;
+  }
+  const tmpl=waState.templates.find(t=>t.id===waEditingTemplateId);
+  if(!tmpl) return;
+  if(!confirm(`Delete template "${tmpl.name}"?`)) return;
+
+  waState.templates=waState.templates.filter(t=>t.id!==waEditingTemplateId);
+  if(waState.activeTemplateId===waEditingTemplateId){
+    waState.activeTemplateId=waState.templates[0].id;
+  }
+  if(waState.creatorTemplates){
+    for(const [phone,tid] of Object.entries(waState.creatorTemplates)){
+      if(tid===waEditingTemplateId) delete waState.creatorTemplates[phone];
+    }
+  }
+  saveWa();
+  renderWaTemplateOptions();
+  renderWhatsApp();
+  if($("waQueueDialog").open&&currentWaContact()){
+    $("waQueueTemplateSelect").value=templateForContact(currentWaContact()).id;
+    $("waQueueMessage").value=waMessageFor(currentWaContact());
+  }
+  $("waTemplateDialog").close();
+  showToast(`Template "${tmpl.name}" deleted`);
+});
+
+document.querySelectorAll(".token-chip-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const token=btn.dataset.token;
+    const textarea=$("waTemplateBody");
+    const start=textarea.selectionStart;
+    const end=textarea.selectionEnd;
+    const text=textarea.value;
+    textarea.value=text.substring(0,start)+token+text.substring(end);
+    textarea.selectionStart=textarea.selectionEnd=start+token.length;
+    textarea.focus();
+  });
+});
+
+$("waSaveAsNewTemplateBtn").addEventListener("click",()=>{
+  const contact=currentWaContact();
+  const currentText=$("waQueueMessage").value.trim();
+  openWaTemplateEditor("add");
+  if(contact&&currentText){
+    const fname=firstName(waLead(contact));
+    const creatorFullName=contact.name||"";
+    const shade=contact.preferred_shade||"";
+    let body=currentText;
+    if(fname&&fname!=="there"){
+      body=body.replace(new RegExp(`\\b${fname}\\b`,"i"),"{first_name}");
+    }
+    if(creatorFullName&&creatorFullName!==fname){
+      body=body.replace(new RegExp(`\\b${creatorFullName}\\b`,"i"),"{name}");
+    }
+    if(shade){
+      body=body.replace(new RegExp(`\\b${shade.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`,"i"),"{preferred_shade}");
+    }
+    $("waTemplateBody").value=body;
+    $("waTemplateName").value="Custom Outreach Proposal";
+    $("waTemplateName").focus();
+    $("waTemplateName").select();
+  }
+});
+
 $("copyBtn").addEventListener("click",()=>copyText($("queueMessage").value,"Message copied"));
 $("copySubjectBtn").addEventListener("click",()=>copyText($("queueSubject").value,"Subject copied"));
 $("openInstagramBtn").addEventListener("click",async()=>{const lead=currentLead();await copyText($("queueMessage").value,"Message copied");openInstagram(lead);});
@@ -414,4 +832,25 @@ $("markRepliedBtn").addEventListener("click",()=>{const lead=currentLead();setSt
 $("resetBtn").addEventListener("click",()=>{if(confirm("Reset every creator status? Campaign settings will remain.")){state.statuses={};save();render();showToast("Progress reset");}});
 $("exportBtn").addEventListener("click",()=>{const rows=[["handle","name","status","updated_at"],...leads.map(l=>[l.handle,l.name||"",statusOf(l.handle),state.statuses[l.handle]?.updatedAt||""])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="creator-outreach-progress.csv";a.click();URL.revokeObjectURL(a.href);});
 
-ensureCompanyProfiles();ensureCampaignLibrary();state.campaign.brand=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];applyCampaignRecord(activeCampaignRecord());leads=await fetch("./data/leads.json").then(r=>r.json());$("homeCompany").value=state.campaign.brand;$("queueCompany").value=state.campaign.brand;renderCampaignOptions();save();render();renderWhatsApp();
+ensureCompanyProfiles();
+ensureCampaignLibrary();
+ensureWaTemplates();
+state.campaign.brand=COMPANIES.includes(state.campaign.brand)?state.campaign.brand:COMPANIES[0];
+applyCampaignRecord(activeCampaignRecord());
+leads=await fetch("./data/leads.json").then(r=>r.json());
+if(!waState.contacts || !waState.contacts.length){
+  try{
+    const defaultContacts=await fetch("./data/creator_contacts.json").then(r=>r.json());
+    if(Array.isArray(defaultContacts)&&defaultContacts.length){
+      waState.contacts=defaultContacts.map(normaliseImportedContact).filter(Boolean);
+      saveWa();
+    }
+  }catch(e){}
+}
+$("homeCompany").value=state.campaign.brand;
+$("queueCompany").value=state.campaign.brand;
+renderCampaignOptions();
+renderWaTemplateOptions();
+save();
+render();
+renderWhatsApp();

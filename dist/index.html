@@ -52,7 +52,13 @@
       <div id="whatsappView" hidden>
         <header class="topbar">
           <div><p class="eyebrow">OLD CREATOR CONTACTS</p><h1>WhatsApp outreach</h1></div>
-          <div class="queue-actions"><label class="button ghost file-button">Import Excel / JSON<input id="waImport" type="file" accept=".xlsx,.xls,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json,text/csv" hidden></label><button class="button primary" id="startWaQueueBtn">Start WhatsApp queue <span>→</span></button></div>
+          <div class="queue-actions">
+            <label class="home-company campaign-picker"><span>Template</span><select id="waHomeTemplate"></select></label>
+            <button class="button ghost" id="waAddTemplateBtn">+ Add template</button>
+            <button class="button ghost" id="waEditTemplateBtn">Edit template</button>
+            <label class="button ghost file-button">Import Excel / JSON<input id="waImport" type="file" accept=".xlsx,.xls,.csv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json,text/csv" hidden></label>
+            <button class="button primary" id="startWaQueueBtn">Start WhatsApp queue <span>→</span></button>
+          </div>
         </header>
         <section class="metrics" aria-label="WhatsApp outreach overview">
           <article><span>Imported contacts</span><strong id="waTotalMetric">0</strong><small>Stored only in this browser</small></article>
@@ -67,7 +73,7 @@
             <div class="filters"><label class="search"><span>⌕</span><input id="waSearchInput" placeholder="Search name or number"></label><select id="waStatusFilter"><option value="all">All statuses</option><option value="pending">Pending</option><option value="sent">Sent</option><option value="replied">Replied</option><option value="skipped">Skipped</option></select></div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Creator</th><th>WhatsApp</th><th>Preferred shade</th><th>Status</th><th>Action</th></tr></thead><tbody id="waCreatorRows"></tbody></table>
+            <table><thead><tr><th>Creator</th><th>WhatsApp</th><th>Preferred shade</th><th>Template</th><th>Status</th><th>Action</th></tr></thead><tbody id="waCreatorRows"></tbody></table>
             <div id="waEmptyState" class="empty">Import the creator contacts JSON file to begin.</div>
           </div>
         </section>
@@ -101,10 +107,75 @@
   <dialog id="waQueueDialog" class="queue-dialog">
     <div class="dialog-head"><div><p class="eyebrow">WHATSAPP QUEUE</p><h2 id="waQueueCreatorName">Creator</h2></div><button class="icon-button" id="closeWaQueueBtn" aria-label="Close">×</button></div>
     <div class="queue-profile"><div class="avatar" id="waQueueAvatar">C</div><div><strong id="waQueueNumber">+91</strong><span id="waQueueMeta">Old collaborator</span></div></div>
-    <label>Personalised WhatsApp message<textarea id="waQueueMessage" rows="11"></textarea></label>
+
+    <div class="wa-template-control-panel">
+      <div class="wa-template-row">
+        <label class="wa-template-dropdown-label" for="waQueueTemplateSelect">
+          <span>Message template</span>
+          <select id="waQueueTemplateSelect"></select>
+        </label>
+        <div class="wa-template-btn-group">
+          <button type="button" class="mini" id="waQueueAddTemplateBtn">+ Add</button>
+          <button type="button" class="mini" id="waQueueEditTemplateBtn">Edit</button>
+          <button type="button" class="mini primary" id="waApplyAllBtn" title="Set this template and message for all creators">Apply to all</button>
+        </div>
+      </div>
+      <div class="wa-template-scope-row">
+        <span class="scope-title">Template selection applies to:</span>
+        <div class="scope-options">
+          <label class="scope-radio-label">
+            <input type="radio" name="waTemplateScope" id="waScopeAll" value="all" checked>
+            <span>All creators</span>
+          </label>
+          <label class="scope-radio-label">
+            <input type="radio" name="waTemplateScope" id="waScopeSingle" value="single">
+            <span id="waScopeSingleLabel">Only this creator</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <label>Personalised WhatsApp message<textarea id="waQueueMessage" rows="10"></textarea></label>
+
+    <div class="wa-template-footer-actions">
+      <div class="tokens">Variables: <code>{first_name}</code> <code>{name}</code> <code>{preferred_shade}</code> <code>{brand}</code> <code>{website}</code></div>
+      <button type="button" class="link-action-btn" id="waSaveAsNewTemplateBtn">+ Save as new template</button>
+    </div>
+
     <div class="queue-buttons"><button class="button ghost" id="waSkipBtn">Skip</button><button class="button secondary" id="waCopyBtn">Copy message</button><button class="button primary" id="openWhatsAppBtn">Open WhatsApp ↗</button></div>
     <p class="queue-help">WhatsApp opens with the message filled in. Review it and press Send yourself, then mark the result here.</p>
     <div class="result-buttons"><button id="waMarkSentBtn">✓ Mark sent & next</button><button id="waMarkRepliedBtn">★ Mark replied</button></div>
+  </dialog>
+
+  <dialog id="waTemplateDialog">
+    <form method="dialog" id="waTemplateForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">WHATSAPP MESSAGE TEMPLATE</p><h2 id="waTemplateDialogTitle">Add WhatsApp template</h2></div>
+        <button type="button" class="icon-button" id="closeWaTemplateBtn" aria-label="Close">×</button>
+      </div>
+      <div class="form-grid" style="grid-template-columns: 1fr; margin-bottom: 12px;">
+        <label>Template name<input id="waTemplateName" required placeholder="e.g. Prediction Talk Monetization"></label>
+      </div>
+      <label>Message template<textarea id="waTemplateBody" rows="10" required placeholder="Hi {first_name},&#10;&#10;..."></textarea></label>
+      <div style="margin-top:8px;">
+        <div style="font-size:11px; font-weight:600; color:var(--muted); margin-bottom:4px;">Click to insert personalization token:</div>
+        <div class="tokens-toolbar">
+          <button type="button" class="token-chip-btn" data-token="{first_name}">+ {first_name}</button>
+          <button type="button" class="token-chip-btn" data-token="{name}">+ {name}</button>
+          <button type="button" class="token-chip-btn" data-token="{preferred_shade}">+ {preferred_shade}</button>
+          <button type="button" class="token-chip-btn" data-token="{brand}">+ {brand}</button>
+          <button type="button" class="token-chip-btn" data-token="{website}">+ {website}</button>
+          <button type="button" class="token-chip-btn" data-token="{whatsapp}">+ {whatsapp}</button>
+        </div>
+      </div>
+      <div class="dialog-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+        <button type="button" class="button ghost danger" id="waDeleteTemplateBtn" style="color:#a83232;">Delete template</button>
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="button ghost" id="cancelWaTemplateBtn">Cancel</button>
+          <button type="button" class="button primary" id="saveWaTemplateBtn">Save template</button>
+        </div>
+      </div>
+    </form>
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
