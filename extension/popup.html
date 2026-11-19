@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Creator Desk Auto-Sender</title>
+  <style>
+    body {
+      width: 260px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #faf8f7;
+      color: #20191d;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: #70264f;
+      color: #fff;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 15px;
+    }
+    h1 {
+      font-size: 14px;
+      margin: 0;
+      font-weight: 700;
+    }
+    small {
+      color: #766c72;
+      font-size: 11px;
+    }
+    .toggle-card {
+      background: #fff;
+      border: 1px solid #e7dfdc;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .toggle-card span {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: .2s;
+      border-radius: 22px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #70264f; }
+    input:checked + .slider:before { transform: translateX(16px); }
+    .note {
+      font-size: 11px;
+      color: #766c72;
+      line-height: 1.45;
+    }
+    .status-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      color: #28634b;
+      background: #e2f4ed;
+      padding: 3px 7px;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">C</div>
+    <div>
+      <h1>Creator Desk</h1>
+      <small>WhatsApp Auto-Sender</small>
+    </div>
+  </div>
+
+  <div class="toggle-card">
+    <span>Auto-Click Send</span>
+    <label class="switch">
+      <input type="checkbox" id="autoSendToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="note">
+    When enabled, opening a Creator Desk link in WhatsApp Web will auto-click Send within 2 seconds.
+    <div><span class="status-badge" id="statusBadge">Active & Ready</span></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
