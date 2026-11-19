@@ -241,16 +241,29 @@ async function main() {
         console.log(`[DRY RUN] Message prepared successfully (not sent).`);
         successCount++;
       } else {
-        // Attempt clicking send button, otherwise press Enter
-        const sendBtn = await page.$('span[data-icon="send"], button[aria-label="Send"], button[data-tab="11"]');
-        if (sendBtn) {
-          await sendBtn.click();
-        } else {
-          await page.keyboard.press("Enter");
+        // 100% Autonomous send: try send button first, then fallback to Enter key
+        let sent = false;
+        try {
+          const sendBtn = await page.$('span[data-icon="send"], button[aria-label="Send"], button[data-tab="11"]');
+          if (sendBtn) {
+            await sendBtn.click();
+            sent = true;
+          }
+        } catch {}
+
+        if (!sent) {
+          try {
+            const inputDiv = await page.$('footer div[contenteditable="true"], div[contenteditable="true"][data-tab="10"]');
+            if (inputDiv) {
+              await inputDiv.focus();
+            }
+            await page.keyboard.press("Enter");
+            sent = true;
+          } catch {}
         }
 
-        // Wait for message to register
-        await new Promise((r) => setTimeout(r, 3000));
+        // Small wait to ensure WhatsApp registers and dispatches the message
+        await new Promise((r) => setTimeout(r, 3500));
 
         progress.sent.push({
           phone,
