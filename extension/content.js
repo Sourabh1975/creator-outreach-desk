@@ -95,6 +95,29 @@
     return false;
   }
 
+  function closeCurrentTab(delayMs = 2200) {
+    setTimeout(() => {
+      try {
+        chrome.runtime.sendMessage({ action: "close_tab" });
+      } catch {}
+      try {
+        window.close();
+      } catch {}
+    }, delayMs);
+  }
+
+  function checkUseHerePopup() {
+    const buttons = document.querySelectorAll('button, div[role="button"]');
+    for (const btn of buttons) {
+      const text = (btn.innerText || "").trim().toLowerCase();
+      if (text === "use here") {
+        btn.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
   function checkInvalidNumberPopup() {
     const modalButtons = document.querySelectorAll('div[role="button"][tabindex="0"], button');
     for (const btn of modalButtons) {
@@ -139,16 +162,19 @@
       // Check timeout (40 seconds)
       if (Date.now() - startTime > 40000) {
         clearInterval(pollInterval);
-        showBadgeStatus("Timeout waiting for chat", "#b23b3b", false);
-        setTimeout(removeFloatingBadge, 3000);
+        showBadgeStatus("Timeout waiting for chat. Closing tab...", "#b23b3b", false);
+        closeCurrentTab(2500);
         return;
       }
+
+      // Check if WhatsApp shows "WhatsApp is open in another window" (Use here)
+      checkUseHerePopup();
 
       // Check for invalid number
       if (checkInvalidNumberPopup()) {
         clearInterval(pollInterval);
-        showBadgeStatus("Number not on WhatsApp (Skipped)", "#9a6b14", false);
-        setTimeout(removeFloatingBadge, 3000);
+        showBadgeStatus("Number not on WhatsApp (Skipped). Closing tab...", "#9a6b14", false);
+        closeCurrentTab(2500);
         return;
       }
 
@@ -179,14 +205,14 @@
             clearInterval(countdownInterval);
             const sent = attemptClickSend();
             if (sent) {
-              showBadgeStatus("✓ Message Sent by Creator Desk!", "#28634b", false);
-              setTimeout(removeFloatingBadge, 3500);
+              showBadgeStatus("✓ Message Sent! Closing tab...", "#28634b", false);
+              closeCurrentTab(2200);
             } else {
               // Retry once after 1 second
               setTimeout(() => {
                 attemptClickSend();
-                showBadgeStatus("✓ Message Sent by Creator Desk!", "#28634b", false);
-                setTimeout(removeFloatingBadge, 3500);
+                showBadgeStatus("✓ Message Sent! Closing tab...", "#28634b", false);
+                closeCurrentTab(2200);
               }, 1000);
             }
           }

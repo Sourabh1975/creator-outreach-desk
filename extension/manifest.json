@@ -3,7 +3,10 @@
   "name": "Creator Desk WhatsApp Auto-Sender",
   "version": "1.0.0",
   "description": "Automatically clicks Send on WhatsApp Web for Creator Desk outreach links without manual pressing.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://web.whatsapp.com/*"
   ],
