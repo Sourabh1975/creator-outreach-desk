@@ -1,11 +1,11 @@
-// Creator Desk Instagram UGC Creator Scraper - FULL AUTO-PILOT ENGINE
+// Creator Desk Instagram UGC Creator Scraper - 100% HANDS-FREE AUTO-PILOT
 (() => {
   let isAutoPilotRunning = false;
   let autoPilotPaused = false;
-  let autoPilotQueue = [];
-  let autoPilotIndex = 0;
+  let autoPilotScannedCount = 0;
   let autoPilotSavedCount = 0;
   let autoPilotTimer = null;
+  let seenUsernames = new Set();
   let lastUrl = "";
 
   const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@(?:gmail|yahoo|outlook|hotmail|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
@@ -25,7 +25,7 @@
 
   function getStoredCreators() {
     return new Promise(resolve => {
-      chrome.storage.local.get({ cd_instagram_creators: [], autoPilotMaxFollowers: 3000, autoPilotRequireContact: true }, items => {
+      chrome.storage.local.get({ cd_instagram_creators: [] }, items => {
         resolve(items.cd_instagram_creators || []);
       });
     });
@@ -37,10 +37,10 @@
     });
   }
 
-  // --- FETCH INSTAGRAM PROFILE VIA INTERNAL WEB API (AUTHENTICATED) ---
+  // --- FETCH USER PROFILE FROM INSTAGRAM INTERNAL API ---
   async function fetchUserProfile(username) {
-    const cleanUser = username.replace(/^@/, "").trim();
-    if (!cleanUser || ["explore", "reels", "direct", "stories", "accounts", "p", "tags"].includes(cleanUser)) {
+    const cleanUser = username.replace(/^@/, "").replace(/\//g, "").trim();
+    if (!cleanUser || ["explore", "reels", "direct", "stories", "accounts", "p", "reel", "tags", "about"].includes(cleanUser)) {
       return null;
     }
 
@@ -85,7 +85,7 @@
     }
   }
 
-  // --- TOP HUD BAR (AUTO-PILOT CONTROLLER) ---
+  // --- TOP HUD BAR ---
   function showAutoPilotHUD(show = true) {
     let hud = document.getElementById("cd-autopilot-hud");
     if (!show) {
@@ -105,26 +105,26 @@
         color: #ffffff;
         border: 2px solid #70264f;
         border-radius: 16px;
-        box-shadow: 0 12px 40px rgba(0,0,0,0.8);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.85);
         padding: 12px 20px;
         display: flex;
         align-items: center;
         gap: 16px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         font-size: 13px;
-        min-width: 480px;
-        max-width: 90vw;
+        min-width: 520px;
+        max-width: 92vw;
       `;
       hud.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:18px; animation: pulse 1.5s infinite;">🤖</span>
+          <span style="font-size:20px;">🤖</span>
           <div>
-            <div style="font-weight:700; color:#fff;" id="cd-hud-status-text">Auto-Pilot: Scanning...</div>
-            <div style="font-size:11px; color:#aaa;" id="cd-hud-subtext">Collecting UGC creators below 3k followers</div>
+            <div style="font-weight:700; color:#fff;" id="cd-hud-status-text">Auto-Pilot: Scanning posts...</div>
+            <div style="font-size:11px; color:#aaa;" id="cd-hud-subtext">Automatically flipping posts & saving &lt;3k creators</div>
           </div>
         </div>
         <div style="flex:1; background:rgba(255,255,255,0.1); border-radius:10px; height:8px; overflow:hidden;">
-          <div id="cd-hud-progress-bar" style="width:0%; background:#22c55e; height:100%; transition:width 0.3s;"></div>
+          <div id="cd-hud-progress-bar" style="width:10%; background:#22c55e; height:100%; transition:width 0.3s;"></div>
         </div>
         <div style="display:flex; gap:8px;">
           <button id="cd-hud-pause-btn" style="background:rgba(255,255,255,0.15); color:#fff; border:0; padding:6px 12px; border-radius:8px; cursor:pointer; font-weight:600; font-size:12px;">Pause</button>
@@ -139,105 +139,149 @@
     hud.style.display = "flex";
   }
 
-  function updateHUDProgress(checked, total, saved, currentCreator = "") {
+  function updateHUDProgress(scanned, saved, currentCreator = "") {
     const statusText = document.getElementById("cd-hud-status-text");
     const subtext = document.getElementById("cd-hud-subtext");
     const bar = document.getElementById("cd-hud-progress-bar");
     if (!statusText || !bar) return;
 
-    const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+    statusText.textContent = `Scanned ${scanned} posts | ${saved} Saved (<3k)`;
+    subtext.textContent = currentCreator ? `Checking: ${currentCreator}...` : `Flipping to next post...`;
+    const pct = Math.min(100, Math.max(10, scanned * 2));
     bar.style.width = `${pct}%`;
-    statusText.textContent = `Scanned ${checked}/${total} (${saved} Saved &lt;3k)`;
-    subtext.textContent = currentCreator ? `Checking: ${currentCreator}...` : `Target: Nano UGC Creators with Email/WhatsApp`;
   }
 
-  // --- AUTO-PILOT EXECUTION ---
+  // --- EXTRACT AUTHOR FROM CURRENT OPEN POST MODAL ---
+  function getAuthorFromOpenModal() {
+    const dialog = document.querySelector("div[role='dialog']");
+    if (!dialog) return null;
+
+    // Look for header profile link
+    const headerLinks = dialog.querySelectorAll("header a[href^='/'], article header a[href^='/']");
+    for (const a of headerLinks) {
+      const href = a.getAttribute("href") || "";
+      const handle = href.replace(/^\/|\/$/g, "");
+      if (handle && !handle.includes("/") && !["explore", "reels", "p", "tags", "about"].includes(handle)) {
+        return handle;
+      }
+    }
+
+    // Secondary selector: span._aasi a or any a[role='link'] in header
+    const fallbackLink = dialog.querySelector("header a[role='link'], div._aa6a a, div._aa73 a");
+    if (fallbackLink) {
+      const handle = (fallbackLink.getAttribute("href") || "").replace(/^\/|\/$/g, "");
+      if (handle && !handle.includes("/")) return handle;
+    }
+
+    return null;
+  }
+
+  // --- ADVANCE TO NEXT POST ON INSTAGRAM ---
+  function goToNextPost() {
+    // 1. Try finding visible next chevron button
+    const nextBtn =
+      document.querySelector("svg[aria-label='Next']")?.closest("button, div[role='button']") ||
+      document.querySelector("button[aria-label='Next']") ||
+      document.querySelector("div[role='dialog'] button._abl-") ||
+      document.querySelector("a._aaqg, a._aaqh");
+
+    if (nextBtn) {
+      nextBtn.click();
+      return true;
+    }
+
+    // 2. Keyboard shortcut fallback: ArrowRight
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", code: "ArrowRight", keyCode: 39, bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", code: "ArrowRight", keyCode: 39, bubbles: true }));
+    return true;
+  }
+
+  // --- MAIN AUTO-PILOT LOOP ---
   async function startAutoPilot() {
     if (isAutoPilotRunning) return;
 
-    // Collect all creator handles on the current page (e.g. from hashtag grid, reels, search results)
-    const handles = extractHandlesFromCurrentPage();
-    if (handles.length === 0) {
-      // Try auto-scrolling once to trigger load
-      window.scrollBy(0, 800);
-      await new Promise(r => setTimeout(r, 1500));
-      handles.push(...extractHandlesFromCurrentPage());
-    }
-
-    if (handles.length === 0) {
-      alert("No creator posts found on this page! Please open a hashtag like #ugccreatorindia or search results first.");
-      return;
-    }
-
-    // Settings
-    const maxFollowers = parseInt(document.getElementById("cd-ig-setting-max-followers")?.value || "3000", 10);
-    const requireContact = document.getElementById("cd-ig-setting-require-contact")?.checked ?? true;
-
-    autoPilotQueue = [...new Set(handles)];
-    autoPilotIndex = 0;
-    autoPilotSavedCount = 0;
-    isAutoPilotRunning = true;
-    autoPilotPaused = false;
-
-    showAutoPilotHUD(true);
-    updateHUDProgress(0, autoPilotQueue.length, 0);
-
-    // Close modal to let user watch the page
     const modal = document.getElementById("cd-ig-modal");
     if (modal) modal.style.display = "none";
 
-    runNextAutoPilotItem(maxFollowers, requireContact);
+    // 1. Check if a post modal is already open
+    let isModalOpen = !!document.querySelector("div[role='dialog']");
+
+    if (!isModalOpen) {
+      // Find the first post/reel thumbnail on the grid
+      const firstPost = document.querySelector("a[href*='/p/'], a[href*='/reel/']");
+      if (!firstPost) {
+        alert("Could not find any posts on this page! Please make sure you are on a search or hashtag page with visible posts.");
+        return;
+      }
+
+      showAutoPilotHUD(true);
+      document.getElementById("cd-hud-status-text").textContent = "Opening first post to start crawl...";
+      firstPost.click();
+      await new Promise(r => setTimeout(r, 1600));
+    }
+
+    const maxFollowers = parseInt(document.getElementById("cd-ig-setting-max-followers")?.value || "3000", 10);
+    const requireContact = document.getElementById("cd-ig-setting-require-contact")?.checked ?? false;
+
+    isAutoPilotRunning = true;
+    autoPilotPaused = false;
+    autoPilotScannedCount = 0;
+    autoPilotSavedCount = 0;
+    seenUsernames.clear();
+
+    showAutoPilotHUD(true);
+    updateHUDProgress(0, 0, "Initializing...");
+
+    runAutoPilotPostStep(maxFollowers, requireContact);
   }
 
-  async function runNextAutoPilotItem(maxFollowers, requireContact) {
+  async function runAutoPilotPostStep(maxFollowers, requireContact) {
     if (!isAutoPilotRunning) return;
     if (autoPilotPaused) return;
 
-    if (autoPilotIndex >= autoPilotQueue.length) {
-      // Try scrolling down to discover more posts
-      const prevCount = autoPilotQueue.length;
-      window.scrollBy(0, 1200);
-      await new Promise(r => setTimeout(r, 2000));
-      const freshHandles = extractHandlesFromCurrentPage();
-      for (const h of freshHandles) {
-        if (!autoPilotQueue.includes(h)) autoPilotQueue.push(h);
+    autoPilotScannedCount++;
+    const author = getAuthorFromOpenModal();
+
+    if (author && !seenUsernames.has(author.toLowerCase())) {
+      seenUsernames.add(author.toLowerCase());
+      updateHUDProgress(autoPilotScannedCount, autoPilotSavedCount, "@" + author);
+
+      const profile = await fetchUserProfile(author);
+
+      if (profile && profile.error === "RATE_LIMITED") {
+        document.getElementById("cd-hud-status-text").textContent = "⚠️ Instagram limit pause. Waiting 20s...";
+        await new Promise(r => setTimeout(r, 20000));
+      } else if (profile) {
+        const isUnderLimit = profile.followersCount <= maxFollowers;
+        const hasContact = profile.email || profile.phone;
+
+        let shouldSave = isUnderLimit;
+        if (requireContact && !hasContact) shouldSave = false;
+
+        if (shouldSave) {
+          await addCreatorToStorage(profile);
+          autoPilotSavedCount++;
+          showFlashToast(`✓ Saved: @${author} (${profile.followersRaw} flw | ${profile.email || 'No email'})`);
+        }
       }
-
-      if (autoPilotQueue.length === prevCount || autoPilotQueue.length >= 100) {
-        finishAutoPilot();
-        return;
-      }
-    }
-
-    const username = autoPilotQueue[autoPilotIndex];
-    autoPilotIndex++;
-
-    updateHUDProgress(autoPilotIndex, autoPilotQueue.length, autoPilotSavedCount, username);
-
-    const profile = await fetchUserProfile(username);
-
-    if (profile && profile.error === "RATE_LIMITED") {
-      document.getElementById("cd-hud-status-text").textContent = "Instagram rate-limit. Waiting 25s...";
-      await new Promise(r => setTimeout(r, 25000));
-    } else if (profile) {
-      const isUnderMax = profile.followersCount <= maxFollowers;
-      const hasContact = profile.email || profile.phone;
-
-      let shouldSave = isUnderMax;
-      if (requireContact && !hasContact) shouldSave = false;
-
-      if (shouldSave) {
-        await addCreatorToStorage(profile);
-        autoPilotSavedCount++;
-        showFlashToast(`✓ Auto-Saved: ${profile.handle} (${profile.followersRaw} followers)`);
-      }
+    } else {
+      updateHUDProgress(autoPilotScannedCount, autoPilotSavedCount, author ? `@${author} (Already seen)` : "Advancing...");
     }
 
     updateCounterBadge();
 
-    // Human-like safe delay (2.2 seconds between profiles)
+    // Check if we reached target
+    if (autoPilotSavedCount >= 50 || autoPilotScannedCount >= 100) {
+      stopAutoPilot();
+      return;
+    }
+
+    // Advance to next post
+    goToNextPost();
+
+    // Safe delay before scanning next post (2.2s)
     autoPilotTimer = setTimeout(() => {
-      runNextAutoPilotItem(maxFollowers, requireContact);
+      runAutoPilotPostStep(maxFollowers, requireContact);
     }, 2200);
   }
 
@@ -247,8 +291,8 @@
       autoPilotPaused = false;
       if (btn) btn.textContent = "Pause";
       const maxFollowers = parseInt(document.getElementById("cd-ig-setting-max-followers")?.value || "3000", 10);
-      const requireContact = document.getElementById("cd-ig-setting-require-contact")?.checked ?? true;
-      runNextAutoPilotItem(maxFollowers, requireContact);
+      const requireContact = document.getElementById("cd-ig-setting-require-contact")?.checked ?? false;
+      runAutoPilotPostStep(maxFollowers, requireContact);
     } else {
       autoPilotPaused = true;
       clearTimeout(autoPilotTimer);
@@ -264,49 +308,11 @@
     showAutoPilotHUD(false);
 
     const list = await getStoredCreators();
-    alert(`🎉 Auto-Pilot Stopped!\nTotal ${list.length} creators saved in your list.\nOpening export table...`);
-
     renderCreatorsTable();
     const modal = document.getElementById("cd-ig-modal");
     if (modal) modal.style.display = "flex";
-  }
 
-  function finishAutoPilot() {
-    isAutoPilotRunning = false;
-    autoPilotPaused = false;
-    clearTimeout(autoPilotTimer);
-    showAutoPilotHUD(false);
-
-    alert(`🎉 Auto-Pilot Completed!\nFinished scanning page. Total ${autoPilotSavedCount} new nano UGC creators saved!`);
-    renderCreatorsTable();
-    const modal = document.getElementById("cd-ig-modal");
-    if (modal) modal.style.display = "flex";
-  }
-
-  function extractHandlesFromCurrentPage() {
-    const handles = new Set();
-
-    // 1. Links to profiles in search/hashtag
-    const links = document.querySelectorAll("a[href^='/']");
-    links.forEach(a => {
-      const path = a.getAttribute("href").replace(/^\/|\/$/g, "");
-      // Exclude system paths
-      if (path && !path.includes("/") && !["explore", "reels", "direct", "stories", "accounts", "p", "tags", "about"].includes(path)) {
-        handles.add(path);
-      }
-    });
-
-    // 2. Look for post authors in modal if open
-    const modalAuthors = document.querySelectorAll("div[role='dialog'] header a, article header a");
-    modalAuthors.forEach(a => {
-      const href = a.getAttribute("href");
-      if (href) {
-        const u = href.replace(/\//g, "").trim();
-        if (u) handles.add(u);
-      }
-    });
-
-    return Array.from(handles);
+    alert(`🎉 Auto-Pilot Completed!\nScanned ${autoPilotScannedCount} posts.\nTotal saved: ${list.length} creators with details.\nReady to Export to Excel!`);
   }
 
   function showFlashToast(msg) {
@@ -325,7 +331,7 @@
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 12px;
         font-weight: 700;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
         z-index: 99999999;
         transition: opacity 0.3s;
       `;
@@ -333,7 +339,7 @@
     }
     toast.textContent = msg;
     toast.style.opacity = "1";
-    setTimeout(() => { if (toast) toast.style.opacity = "0"; }, 2000);
+    setTimeout(() => { if (toast) toast.style.opacity = "0"; }, 2200);
   }
 
   // --- FLOATING WIDGET UI ---
@@ -344,7 +350,6 @@
     root.id = "cd-ig-widget-root";
     root.innerHTML = `
       <style>
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
         #cd-ig-widget-root {
           position: fixed;
           bottom: 24px;
@@ -518,20 +523,20 @@
       <div id="cd-ig-modal" class="cd-ig-modal">
         <div class="cd-ig-modal-header">
           <div class="cd-ig-modal-title">
-            <span>📸 Instagram UGC Scraper (<3K Followers / ₹500 Collabs)</span>
+            <span>📸 Instagram UGC Scraper (&lt;3K Followers / ₹500 Collabs)</span>
           </div>
           <button id="cd-ig-close-modal" style="background:transparent; border:0; color:#fff; font-size:18px; cursor:pointer;">✕</button>
         </div>
         <div class="cd-ig-modal-body">
           
-          <!-- 100% HANDS-FREE AUTO-PILOT CONTROL PANEL -->
+          <!-- AUTO-PILOT CONTROL PANEL -->
           <div class="cd-autopilot-panel">
             <div>
               <div style="font-weight:800; font-size:14px; color:#fff; display:flex; align-items:center; gap:6px;">
                 <span>⚡ 100% Hands-Free Auto-Pilot Scraper</span>
               </div>
               <div style="font-size:11px; color:#ddd; margin-top:4px;">
-                Automatically crawls hashtag posts, extracts emails/numbers, filters &lt;3k followers & saves!
+                Opens posts automatically, advances to next reel, extracts emails & saves &lt;3k creators!
               </div>
               <div style="display:flex; align-items:center; gap:12px; margin-top:8px; font-size:11px;">
                 <label style="display:flex; align-items:center; gap:4px;">
@@ -539,7 +544,7 @@
                   <input type="number" id="cd-ig-setting-max-followers" value="3000" style="width:65px; background:#111; color:#fff; border:1px solid #555; border-radius:4px; padding:2px 6px;">
                 </label>
                 <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
-                  <input type="checkbox" id="cd-ig-setting-require-contact" checked> Require Email or WhatsApp
+                  <input type="checkbox" id="cd-ig-setting-require-contact"> Require Email / WhatsApp
                 </label>
               </div>
             </div>
@@ -549,7 +554,7 @@
           </div>
 
           <div id="cd-ig-empty-msg" style="text-align:center; padding:30px 10px; color:#777;">
-            No creators collected yet.<br>Click <b>▶ Start Auto-Pilot</b> on any hashtag (like <a href="/explore/tags/ugccreatorindia/" style="color:#b23b72;">#ugccreatorindia</a>) to collect all creators automatically!
+            No creators collected yet.<br>Click <b>▶ Start Auto-Pilot</b> to automatically crawl all posts on this page!
           </div>
 
           <table id="cd-ig-creators-table" class="cd-ig-table" style="display:none;">
@@ -660,100 +665,6 @@
     });
   }
 
-  // --- MANUAL PROFILE QUICK-SAVE (IF BROWSING) ---
-  function parseCurrentProfileDom() {
-    const path = window.location.pathname.replace(/^\/|\/$/g, "");
-    if (!path || path.includes("/") || ["explore", "reels", "direct", "stories", "accounts", "p", "tags"].includes(path)) {
-      return null;
-    }
-
-    const handle = "@" + path;
-    const header = document.querySelector("header");
-    if (!header) return null;
-
-    const nameEl = header.querySelector("h1") || header.querySelector("section > div:last-child > span");
-    const name = nameEl ? nameEl.innerText.trim() : path;
-
-    let followersRaw = "";
-    const listItems = Array.from(header.querySelectorAll("li, a[href*='/followers/']"));
-    for (const item of listItems) {
-      const text = item.innerText || item.textContent;
-      if (/followers?/i.test(text)) {
-        followersRaw = text.replace(/followers?/i, "").trim();
-        break;
-      }
-    }
-    if (!followersRaw) {
-      const titleSpan = header.querySelector("span[title]");
-      if (titleSpan) followersRaw = titleSpan.getAttribute("title") || titleSpan.innerText;
-    }
-
-    const followersCount = parseFollowerNumber(followersRaw);
-    const bioText = header.innerText || "";
-    const emails = bioText.match(EMAIL_REGEX) || [];
-    const validEmails = emails.filter(em => !em.includes("instagram.com") && !em.includes("sentry.io"));
-    const email = validEmails.length ? validEmails[0].toLowerCase() : "";
-
-    const phones = bioText.match(PHONE_REGEX) || [];
-    const phone = phones.length ? phones[0] : "";
-
-    const linkEl = header.querySelector("a[href*='l.instagram.com'], a[target='_blank']");
-    const externalLink = linkEl ? linkEl.href : "";
-
-    return {
-      handle,
-      name,
-      followersRaw: followersRaw || "Unknown",
-      followersCount,
-      email,
-      phone,
-      bio: bioText.slice(0, 300).replace(/\n/g, " "),
-      externalLink,
-      profileUrl: window.location.href,
-      addedAt: new Date().toLocaleDateString()
-    };
-  }
-
-  function showProfileBanner(creator) {
-    const existing = document.getElementById("cd-ig-profile-banner");
-    if (existing) existing.remove();
-
-    const isUnder3k = (creator.followersCount !== null && creator.followersCount <= 3000) || (!creator.followersCount && !creator.followersRaw.includes("K") && !creator.followersRaw.includes("M"));
-
-    const banner = document.createElement("div");
-    banner.id = "cd-ig-profile-banner";
-    banner.className = "cd-profile-quick-banner";
-    banner.innerHTML = `
-      <div>
-        <div style="font-weight:700; display:flex; align-items:center; gap:6px;">
-          <span>${creator.handle}</span>
-          <span class="${isUnder3k ? 'cd-ig-badge-fit' : 'cd-ig-badge-high'}">${isUnder3k ? '✓ &lt;3k (Budget Fit)' : '>3k'}</span>
-        </div>
-        <div style="font-size:11px; color:#aaa; margin-top:2px;">
-          ${creator.followersRaw} followers • ${creator.email ? `<span style="color:#4ade80;">${creator.email}</span>` : 'No email'}
-        </div>
-      </div>
-      <button id="cd-ig-save-btn" style="background:#22c55e; color:#000; border:0; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer; font-size:11px; white-space:nowrap;">
-        + Save
-      </button>
-      <button id="cd-ig-dismiss-banner" style="background:transparent; border:0; color:#888; cursor:pointer; font-size:14px;">✕</button>
-    `;
-
-    document.body.appendChild(banner);
-
-    document.getElementById("cd-ig-dismiss-banner").onclick = () => banner.remove();
-
-    const saveBtn = document.getElementById("cd-ig-save-btn");
-    saveBtn.onclick = async () => {
-      await addCreatorToStorage(creator);
-      saveBtn.textContent = "✓ Saved!";
-      saveBtn.style.background = "#555";
-      saveBtn.style.color = "#fff";
-      saveBtn.disabled = true;
-      setTimeout(() => banner.remove(), 2000);
-    };
-  }
-
   async function addCreatorToStorage(creator) {
     const list = await getStoredCreators();
     const existingIdx = list.findIndex(c => c.handle.toLowerCase() === creator.handle.toLowerCase());
@@ -815,28 +726,8 @@
     alert(`Copied ${list.length} creators to clipboard in Creator Desk format! You can paste or import directly into Creator Desk.`);
   }
 
-  // --- URL CHANGE DETECTION (SPA) ---
-  function checkUrlChange() {
-    const currentUrl = window.location.href;
-    if (currentUrl !== lastUrl) {
-      lastUrl = currentUrl;
-      const banner = document.getElementById("cd-ig-profile-banner");
-      if (banner) banner.remove();
-
-      if (!isAutoPilotRunning) {
-        setTimeout(() => {
-          const creator = parseCurrentProfileDom();
-          if (creator) {
-            showProfileBanner(creator);
-          }
-        }, 1200);
-      }
-    }
-  }
-
   function init() {
     injectFloatingWidget();
-    setInterval(checkUrlChange, 1000);
   }
 
   if (document.readyState === "complete" || document.readyState === "interactive") {
