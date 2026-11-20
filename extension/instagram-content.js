@@ -1,4 +1,4 @@
-// Creator Desk Instagram UGC Creator Scraper - REAL PROFILE BIO CRAWLER
+// Creator Desk Instagram UGC Creator Scraper - UNIQUE PROFILES ONLY & PAUSE CONTROLLER
 (() => {
   const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@(?:gmail|yahoo|outlook|hotmail|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
   const PHONE_REGEX = /(?:\+?91[\-\s]?)?[6789]\d{9}/g;
@@ -90,7 +90,7 @@
     };
   }
 
-  // --- PERSISTENT CRAWLER ENGINE (USES SESSIONSTORAGE) ---
+  // --- PERSISTENT CRAWLER ENGINE (SESSIONSTORAGE) ---
   function getCrawlerState() {
     try {
       const raw = sessionStorage.getItem("cd_profile_crawler");
@@ -108,8 +108,8 @@
     }
   }
 
-  // --- TOP HUD BAR ---
-  function showAutoPilotHUD(statusMsg, subMsg = "") {
+  // --- TOP HUD BAR WITH PAUSE / RESUME & STOP ---
+  function showAutoPilotHUD(statusMsg, subMsg = "", isPaused = false) {
     let hud = document.getElementById("cd-autopilot-hud");
     if (!hud) {
       hud = document.createElement("div");
@@ -131,7 +131,7 @@
         gap: 16px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         font-size: 13px;
-        min-width: 520px;
+        min-width: 560px;
         max-width: 92vw;
       `;
       hud.innerHTML = `
@@ -143,13 +143,26 @@
           </div>
         </div>
         <div style="flex:1;"></div>
-        <button id="cd-hud-stop-btn" style="background:#ef4444; color:#fff; border:0; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:12px;">⏹ Stop & Export</button>
+        <div style="display:flex; gap:8px;">
+          <button id="cd-hud-pause-btn" style="background:#2563eb; color:#fff; border:0; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:12px; transition:background 0.2s;">
+            ${isPaused ? "▶ Resume" : "⏸ Pause"}
+          </button>
+          <button id="cd-hud-stop-btn" style="background:#ef4444; color:#fff; border:0; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:12px;">
+            ⏹ Stop & Export
+          </button>
+        </div>
       `;
       document.body.appendChild(hud);
+      document.getElementById("cd-hud-pause-btn").onclick = toggleCrawlerPause;
       document.getElementById("cd-hud-stop-btn").onclick = stopCrawlerAndExport;
     } else {
       document.getElementById("cd-hud-status-text").textContent = statusMsg;
       document.getElementById("cd-hud-subtext").textContent = subMsg;
+      const pauseBtn = document.getElementById("cd-hud-pause-btn");
+      if (pauseBtn) {
+        pauseBtn.textContent = isPaused ? "▶ Resume" : "⏸ Pause";
+        pauseBtn.style.background = isPaused ? "#16a34a" : "#2563eb";
+      }
       hud.style.display = "flex";
     }
   }
@@ -159,7 +172,28 @@
     if (hud) hud.style.display = "none";
   }
 
-  // --- START THE REAL PROFILE CRAWLER ---
+  // --- PAUSE / RESUME HANDLER ---
+  function toggleCrawlerPause() {
+    const state = getCrawlerState();
+    if (!state) return;
+
+    if (state.paused) {
+      // Resume
+      state.paused = false;
+      setCrawlerState(state);
+      showAutoPilotHUD("Resuming crawler...", "Moving to next unique creator...", false);
+      showFlashToast("▶ Auto-Pilot Resumed");
+      setTimeout(processCrawlerStep, 800);
+    } else {
+      // Pause
+      state.paused = true;
+      setCrawlerState(state);
+      showAutoPilotHUD("⏸ Auto-Pilot Paused", "Click Resume to continue scanning", true);
+      showFlashToast("⏸ Auto-Pilot Paused");
+    }
+  }
+
+  // --- START REAL PROFILE CRAWLER ---
   async function startRealProfileCrawler() {
     const allPosts = Array.from(document.querySelectorAll("a[href*='/p/'], a[href*='/reel/']"));
     if (allPosts.length === 0) {
@@ -170,19 +204,24 @@
     const maxFollowers = parseInt(document.getElementById("cd-ig-setting-max-followers")?.value || "3000", 10);
     const requireContact = document.getElementById("cd-ig-setting-require-contact")?.checked ?? false;
 
-    // Collect all post URLs
+    // Collect all posts on the page
     const postHrefs = allPosts.map(a => a.getAttribute("href")).filter(Boolean);
+
+    // Pre-populate seen authors with anyone ALREADY in database (strictly no repeats!)
+    const existingCreators = await getStoredCreators();
+    const alreadySavedHandles = existingCreators.map(c => c.handle.toLowerCase().replace("@", ""));
 
     const state = {
       active: true,
+      paused: false,
       searchUrl: window.location.href,
       postHrefs: [...new Set(postHrefs)],
       currentIndex: 0,
       scannedCount: 0,
       savedCount: 0,
+      seenAuthors: [...new Set(alreadySavedHandles)], // Never visit existing or repeated creators!
       maxFollowers,
-      requireContact,
-      step: "OPEN_POST" // "OPEN_POST" -> "VISIT_PROFILE" -> "BACK_TO_SEARCH"
+      requireContact
     };
 
     setCrawlerState(state);
@@ -190,7 +229,7 @@
     const modal = document.getElementById("cd-ig-modal");
     if (modal) modal.style.display = "none";
 
-    showAutoPilotHUD("Starting Profile Crawler...", "Preparing first post...");
+    showAutoPilotHUD("Starting Unique Profile Crawler...", "Loading first unique creator...", false);
     processCrawlerStep();
   }
 
@@ -199,15 +238,22 @@
     const state = getCrawlerState();
     if (!state || !state.active) return;
 
-    showAutoPilotHUD(
-      `Auto-Pilot: Checking Creator ${state.scannedCount + 1}/${Math.min(30, state.postHrefs.length)}`,
-      `${state.savedCount} Saved (<3k followers) | Visiting real profile bio...`
-    );
+    // If currently paused, don't execute
+    if (state.paused) {
+      showAutoPilotHUD("⏸ Auto-Pilot Paused", "Click Resume to continue scanning", true);
+      return;
+    }
 
-    // If on a CREATOR'S PROFILE PAGE
+    // 1. IF CURRENTLY ON A CREATOR'S PROFILE PAGE
     const profile = readProfilePageData();
     if (profile) {
-      // We are ON the creator's real profile page!
+      const cleanHandle = profile.handle.toLowerCase().replace("@", "");
+
+      // Ensure marked as seen
+      if (!state.seenAuthors.includes(cleanHandle)) {
+        state.seenAuthors.push(cleanHandle);
+      }
+
       state.scannedCount++;
       const isUnderLimit = profile.followersCount <= state.maxFollowers;
       const hasContact = profile.email || profile.phone;
@@ -225,72 +271,106 @@
         }
         await saveStoredCreators(curList);
         state.savedCount++;
-        showFlashToast(`✓ Bio Scanned: ${profile.handle} (${profile.followersRaw} flw | ${profile.email || 'DM Only'})`);
+        showFlashToast(`✓ Saved: ${profile.handle} (${profile.followersRaw} flw | ${profile.email || 'DM Only'})`);
       } else {
         showFlashToast(`Skipped ${profile.handle}: ${profile.followersRaw} followers`);
       }
 
       state.currentIndex++;
-      if (state.scannedCount >= 25 || state.currentIndex >= state.postHrefs.length) {
+      if (state.savedCount >= 30 || state.currentIndex >= state.postHrefs.length) {
         setCrawlerState(null);
         hideAutoPilotHUD();
-        alert(`🎉 Profile Crawl Finished!\nScanned ${state.scannedCount} real creator profiles.\nTotal saved: ${state.savedCount} creators with bio & email!`);
+        alert(`🎉 Profile Crawl Finished!\nScanned ${state.scannedCount} unique creators.\nTotal saved: ${state.savedCount} creators with bio & email!`);
         window.location.href = state.searchUrl;
         return;
       }
 
-      // Navigate back to search page to open next post
+      // Save state and navigate back to search page
       setCrawlerState(state);
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1400));
       window.location.href = state.searchUrl;
       return;
     }
 
-    // If on SEARCH / HASHTAG PAGE
-    if (window.location.href.includes("/explore/") || window.location.href.includes("/tags/")) {
-      await new Promise(r => setTimeout(r, 1200));
+    // 2. IF CURRENTLY ON SEARCH / HASHTAG PAGE
+    if (window.location.href.includes("/explore/") || window.location.href.includes("/tags/") || window.location.href.includes("/search/")) {
+      showAutoPilotHUD(
+        `Auto-Pilot: Checking Post ${state.currentIndex + 1}/${state.postHrefs.length}`,
+        `${state.savedCount} Unique Saved (<3k) | ${state.seenAuthors.length} total creators seen`,
+        false
+      );
 
-      // Find the next post tile
-      const currentHref = state.postHrefs[state.currentIndex];
-      let tile = document.querySelector(`a[href='${currentHref}']`);
+      await new Promise(r => setTimeout(r, 1000));
 
-      if (!tile) {
-        // Scroll down to find it
-        window.scrollBy(0, 800);
-        await new Promise(r => setTimeout(r, 1500));
-        tile = document.querySelector(`a[href='${currentHref}']`) || document.querySelector("a[href*='/p/'], a[href*='/reel/']");
+      // Loop to find the NEXT UNIQUE creator post
+      while (state.currentIndex < state.postHrefs.length) {
+        if (state.paused) {
+          setCrawlerState(state);
+          showAutoPilotHUD("⏸ Auto-Pilot Paused", "Click Resume to continue", true);
+          return;
+        }
+
+        const currentHref = state.postHrefs[state.currentIndex];
+        let tile = document.querySelector(`a[href='${currentHref}']`);
+
+        if (!tile) {
+          // Scroll down to load more post elements
+          window.scrollBy(0, 800);
+          await new Promise(r => setTimeout(r, 1200));
+          tile = document.querySelector(`a[href='${currentHref}']`);
+        }
+
+        if (!tile) {
+          state.currentIndex++;
+          continue;
+        }
+
+        // Open post modal
+        tile.scrollIntoView({ behavior: "smooth", block: "center" });
+        await new Promise(r => setTimeout(r, 400));
+        tile.click();
+
+        // Wait for modal to render (1.2s)
+        await new Promise(r => setTimeout(r, 1200));
+
+        const dialog = document.querySelector("div[role='dialog']");
+        const authorLink = dialog ? dialog.querySelector("header a[href^='/'], article header a[href^='/'], div._aa6a a") : null;
+
+        if (authorLink) {
+          const href = authorLink.getAttribute("href") || "";
+          const author = href.replace(/^\/|\/$/g, "").toLowerCase();
+
+          // DEDUPLICATION CHECK: Has this creator already been seen or saved?
+          if (state.seenAuthors.includes(author)) {
+            // REPEATED CREATOR! Skip without visiting!
+            showFlashToast(`⏭ Skipped repeated: @${author}`);
+            closeModal();
+            state.currentIndex++;
+            await new Promise(r => setTimeout(r, 600));
+            continue; // Move to next post immediately!
+          }
+
+          // BRAND NEW UNIQUE CREATOR FOUND!
+          state.seenAuthors.push(author);
+          setCrawlerState(state);
+          showFlashToast(`🔍 Visiting unique profile: @${author}...`);
+          window.location.href = `https://www.instagram.com/${author}/`;
+          return;
+        } else {
+          // No author link found, close and try next
+          closeModal();
+          state.currentIndex++;
+          await new Promise(r => setTimeout(r, 600));
+        }
       }
 
-      if (!tile) {
-        state.currentIndex++;
-        setCrawlerState(state);
-        processCrawlerStep();
-        return;
-      }
-
-      // Click the post to open modal
-      tile.scrollIntoView({ behavior: "smooth", block: "center" });
-      await new Promise(r => setTimeout(r, 400));
-      tile.click();
-
-      // Wait for modal to render (1.2s)
-      await new Promise(r => setTimeout(r, 1200));
-
-      const dialog = document.querySelector("div[role='dialog']");
-      const authorLink = dialog ? dialog.querySelector("header a[href^='/'], article header a[href^='/'], div._aa6a a") : null;
-
-      if (authorLink) {
-        const href = authorLink.getAttribute("href");
-        setCrawlerState(state);
-        // Navigate directly to creator profile!
-        window.location.href = `https://www.instagram.com${href}`;
-      } else {
-        // If author link not found, close and advance
-        closeModal();
-        state.currentIndex++;
-        setCrawlerState(state);
-        setTimeout(processCrawlerStep, 1000);
-      }
+      // Reached end of post list
+      setCrawlerState(null);
+      hideAutoPilotHUD();
+      alert(`🎉 Crawl Complete!\nAll unique posts on this page have been checked.\nSaved: ${state.savedCount} creators!`);
+      renderCreatorsTable();
+      const modal = document.getElementById("cd-ig-modal");
+      if (modal) modal.style.display = "flex";
     }
   }
 
@@ -301,7 +381,6 @@
   }
 
   function stopCrawlerAndExport() {
-    const state = getCrawlerState();
     setCrawlerState(null);
     hideAutoPilotHUD();
     closeModal();
@@ -337,7 +416,7 @@
     }
     toast.textContent = msg;
     toast.style.opacity = "1";
-    setTimeout(() => { if (toast) toast.style.opacity = "0"; }, 2500);
+    setTimeout(() => { if (toast) toast.style.opacity = "0"; }, 2400);
   }
 
   // --- FLOATING WIDGET UI ---
@@ -389,7 +468,7 @@
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          width: 800px;
+          width: 820px;
           max-width: 95vw;
           max-height: 88vh;
           background: #18181f;
@@ -504,7 +583,7 @@
       <div id="cd-ig-modal" class="cd-ig-modal">
         <div class="cd-ig-modal-header">
           <div class="cd-ig-modal-title">
-            <span>📸 Instagram UGC Profile Scraper (&lt;3K Followers / ₹500 Collabs)</span>
+            <span>📸 Instagram UGC Scraper (&lt;3K Followers / ₹500 Collabs)</span>
           </div>
           <button id="cd-ig-close-modal" style="background:transparent; border:0; color:#fff; font-size:18px; cursor:pointer;">✕</button>
         </div>
@@ -514,10 +593,10 @@
           <div class="cd-autopilot-panel">
             <div>
               <div style="font-weight:800; font-size:14px; color:#fff; display:flex; align-items:center; gap:6px;">
-                <span>⚡ Real Profile Bio Scraper (Hands-Free)</span>
+                <span>⚡ Unique Profile Bio Scraper (Hands-Free)</span>
               </div>
               <div style="font-size:11px; color:#ddd; margin-top:4px;">
-                Visits creator profile pages automatically, reads full bio & exact followers, saves &lt;3k leads!
+                Opens each unique creator profile, reads bio/email, skips duplicate creators, with Pause/Resume!
               </div>
               <div style="display:flex; align-items:center; gap:12px; margin-top:8px; font-size:11px;">
                 <label style="display:flex; align-items:center; gap:4px;">
@@ -525,7 +604,7 @@
                   <input type="number" id="cd-ig-setting-max-followers" value="3000" style="width:65px; background:#111; color:#fff; border:1px solid #555; border-radius:4px; padding:2px 6px;">
                 </label>
                 <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
-                  <input type="checkbox" id="cd-ig-setting-require-contact"> Require Email / WhatsApp in Bio
+                  <input type="checkbox" id="cd-ig-setting-require-contact"> Require Email / WhatsApp
                 </label>
               </div>
             </div>
@@ -535,7 +614,7 @@
           </div>
 
           <div id="cd-ig-empty-msg" style="text-align:center; padding:30px 10px; color:#777;">
-            No creators collected yet.<br>Click <b>▶ Start Profile Crawl</b> on your search page to collect all creator bios automatically!
+            No creators collected yet.<br>Click <b>▶ Start Profile Crawl</b> to collect unique creator bios automatically!
           </div>
 
           <table id="cd-ig-creators-table" class="cd-ig-table" style="display:none;">
@@ -705,7 +784,11 @@
     // Check if an active crawler session is in progress
     const state = getCrawlerState();
     if (state && state.active) {
-      setTimeout(processCrawlerStep, 1000);
+      if (state.paused) {
+        showAutoPilotHUD("⏸ Auto-Pilot Paused", "Click Resume to continue scanning", true);
+      } else {
+        setTimeout(processCrawlerStep, 1000);
+      }
     }
   }
 
