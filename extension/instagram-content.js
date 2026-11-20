@@ -778,7 +778,13 @@
   }
 
   // --- INITIALIZATION ---
-  function init() {
+  async function init() {
+    const stored = await chrome.storage.local.get({ masterEnabled: true });
+    if (stored.masterEnabled === false) {
+      console.log("[Creator Desk] Master Switch is OFF. Instagram widget disabled.");
+      return;
+    }
+
     injectFloatingWidget();
 
     // Check if an active crawler session is in progress
@@ -791,6 +797,23 @@
       }
     }
   }
+
+  // Live storage listener for Master Switch on Instagram
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.masterEnabled) {
+      if (changes.masterEnabled.newValue === false) {
+        const widget = document.getElementById("cd-ig-widget-root");
+        if (widget) widget.remove();
+        const hud = document.getElementById("cd-autopilot-hud");
+        if (hud) hud.remove();
+        const toast = document.getElementById("cd-flash-toast");
+        if (toast) toast.remove();
+        setCrawlerState(null);
+      } else if (changes.masterEnabled.newValue === true) {
+        injectFloatingWidget();
+      }
+    }
+  });
 
   if (document.readyState === "complete" || document.readyState === "interactive") {
     init();

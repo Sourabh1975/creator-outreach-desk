@@ -117,10 +117,11 @@
       return;
     }
 
-    // Check if user enabled in settings
-    const stored = await chrome.storage.local.get({ autoSendEmailEnabled: true });
-    if (!stored.autoSendEmailEnabled) {
-      console.log("[Creator Desk Gmail Auto-Sender] Disabled in extension settings.");
+    // Check if master power switch or gmail auto-send is enabled
+    const stored = await chrome.storage.local.get({ masterEnabled: true, autoSendEmailEnabled: true });
+    if (stored.masterEnabled === false || !stored.autoSendEmailEnabled) {
+      console.log("[Creator Desk Gmail Auto-Sender] Extension Master Switch or Gmail Auto-Sender is OFF.");
+      removeFloatingBadge();
       return;
     }
 
@@ -193,4 +194,13 @@
   } else {
     window.addEventListener("DOMContentLoaded", startGmailAutoSendRoutine);
   }
+
+  // Live listener for Master Switch toggling
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.masterEnabled && changes.masterEnabled.newValue === false) {
+      isCancelled = true;
+      clearTimeout(activeTimer);
+      removeFloatingBadge();
+    }
+  });
 })();

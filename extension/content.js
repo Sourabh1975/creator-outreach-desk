@@ -140,10 +140,11 @@
     if (lastProcessedUrl === currentUrl) return;
     lastProcessedUrl = currentUrl;
 
-    // Check if user disabled in settings
-    const stored = await chrome.storage.local.get({ autoSendEnabled: true });
-    if (!stored.autoSendEnabled) {
-      console.log("[Creator Desk Auto-Sender] Disabled in extension settings.");
+    // Check if user disabled in settings or master power switch
+    const stored = await chrome.storage.local.get({ masterEnabled: true, autoSendEnabled: true });
+    if (stored.masterEnabled === false || !stored.autoSendEnabled) {
+      console.log("[Creator Desk Auto-Sender] Extension Master Switch or WhatsApp Auto-Sender is OFF.");
+      removeFloatingBadge();
       return;
     }
 
@@ -227,6 +228,15 @@
   } else {
     window.addEventListener("DOMContentLoaded", startAutoSendRoutine);
   }
+
+  // Live listener for Master Switch toggling
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.masterEnabled && changes.masterEnabled.newValue === false) {
+      isCancelled = true;
+      clearTimeout(activeTimer);
+      removeFloatingBadge();
+    }
+  });
 
   // Observe URL changes (e.g. when website navigates same tab to next creator)
   let prevUrl = window.location.href;
